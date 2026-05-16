@@ -1,0 +1,317 @@
+@import "tailwindcss";
+
+/* ============================
+   FIFA WORLD CUP 2026 — DESIGN SYSTEM
+   ============================ */
+
+:root {
+  /* Fundo claro, detalhes nas cores da Copa */
+  --bg-main: #F8FAFC;
+  --bg-sec: #E2E8F0;
+  --card-bg: #FFFFFF;
+  --input-bg: #F1F5F9;
+  
+  /* Cores vibrantes da Copa */
+  --primary: #00AEEF; /* Azul */
+  --success: #00C96D; /* Verde */
+  --danger: #EE324E;  /* Vermelho */
+  --warning: #F5B700; /* Amarelo/Dourado */
+  
+  /* Textos Modo Claro */
+  --text-main: #0F172A;
+  --text-sec: #475569;
+  --text-muted: #94A3B8;
+  
+  /* Bordas e Elementos Transparentes */
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-light: rgba(0, 0, 0, 0.05);
+  
+  --bg-hover: rgba(0, 0, 0, 0.02);
+  --bg-hover-strong: rgba(0, 0, 0, 0.05);
+  
+  --primary-light: rgba(0, 174, 239, 0.1);
+  --primary-light-strong: rgba(0, 174, 239, 0.15);
+  --success-light: rgba(0, 201, 109, 0.1);
+  --warning-light: rgba(245, 183, 0, 0.1);
+  --danger-light: rgba(238, 50, 78, 0.1);
+  
+  --bg-main-transparent: rgba(248, 250, 252, 0.9);
+}
+
+.dark {
+  /* Fundo azul bem escuro */
+  --bg-main: #07111F;
+  --bg-sec: #101B2D;
+  --card-bg: #132238;
+  --input-bg: #0B1F3A;
+  
+  /* Cores vibrantes da Copa mantidas */
+  --primary: #00AEEF;
+  --success: #00C96D;
+  --danger: #EE324E;
+  --warning: #F5B700;
+  
+  /* Textos Modo Escuro */
+  --text-main: #FFFFFF;
+  --text-sec: #A9B4C7;
+  --text-muted: #6B778C;
+  
+  /* Bordas e Elementos Transparentes */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.05);
+  
+  --bg-hover: rgba(255, 255, 255, 0.02);
+  --bg-hover-strong: rgba(255, 255, 255, 0.03);
+  
+  --primary-light: rgba(0, 174, 239, 0.1);
+  --primary-light-strong: rgba(0, 174, 239, 0.15);
+  --success-light: rgba(0, 201, 109, 0.1);
+  --warning-light: rgba(245, 183, 0, 0.1);
+  --danger-light: rgba(238, 50, 78, 0.1);
+  
+  --bg-main-transparent: rgba(7, 17, 31, 0.9);
+}
+
+/* ============================
+   RESET & BASE — FORCED SPACING
+   ============================ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ============================
+   GLOBAL FORM SPACING FIX
+   Force spacing between labels and inputs
+   ============================ */
+form div {
+  margin-bottom: 24px;
+}
+
+form label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6B778C;
+}
+
+input, textarea, select {
+  width: 100%;
+  display: block;
+}
+
+/* ============================
+   TYPOGRAPHY
+   ============================ */
+h1, h2, h3, .heading {
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+/* ============================
+   LAYOUT UTILITIES
+   ============================ */
+.page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+/* ============================
+   CARDS
+   ============================ */
+.card {
+  background: #132238;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 32px;
+}
+
+.card-elevated {
+  background: #132238;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.dashboard-action-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(0,0,0,0.4);
+}
+
+.hover-row {
+  transition: background 0.2s ease;
+}
+.hover-row:hover {
+  background: var(--bg-hover-strong);
+}
+
+/* ============================
+   INPUTS
+   ============================ */
+.input-dark {
+  background: #0B1F3A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+  color: #FFFFFF;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.input-dark:focus {
+  border-color: #00AEEF;
+  box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.1);
+}
+
+/* ============================
+   BUTTONS
+   ============================ */
+.btn-primary {
+  background: #00AEEF;
+  color: #FFFFFF;
+  font-weight: 700;
+  padding: 16px 24px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -4px rgba(0, 174, 239, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.btn-gold {
+  background: #F5B700;
+  color: #07111F;
+  font-weight: 800;
+  padding: 16px 24px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -4px rgba(245, 183, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+/* ============================
+   PROGRESS BAR
+   ============================ */
+.progress-track {
+  height: 10px;
+  background: #0B1F3A;
+  border-radius: 100px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, #00C96D, #00AEEF);
+}
+
+/* ============================
+   SKELETON
+   ============================ */
+@keyframes shimmer {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.5; }
+}
+
+.skeleton {
+  background: rgba(255, 255, 255, 0.05);
+  animation: shimmer 1.5s infinite;
+}
+
+/* Leaflet dark theme */
+.leaflet-container {
+  background: #07111F !important;
+}
+.leaflet-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+/* Prevent Tailwind v4 Lightning CSS from tree-shaking variables used only in React inline styles */
+.keep-variables {
+  color: var(--primary);
+  background: var(--success);
+  border-color: var(--danger);
+  outline-color: var(--warning);
+  fill: var(--card-bg);
+  stroke: var(--input-bg);
+  --keep-1: var(--text-sec);
+  --keep-2: var(--text-muted);
+  --keep-3: var(--border-color);
+  --keep-4: var(--border-light);
+  --keep-5: var(--bg-hover);
+  --keep-6: var(--bg-hover-strong);
+  --keep-7: var(--primary-light);
+  --keep-8: var(--primary-light-strong);
+  --keep-9: var(--success-light);
+  --keep-10: var(--warning-light);
+  --keep-11: var(--danger-light);
+  --keep-12: var(--bg-main-transparent);
+  --keep-13: var(--bg-sec);
+}
+
+/* ============================
+   GLOBAL FOCUS STYLES
+   ============================ */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.12) !important;
+  outline: none;
+}
+
+/* ============================
+   CUSTOM SCROLLBAR
+   ============================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ============================
+   LINK RESET
+   ============================ */
+a {
+  color: inherit;
+}
+
+/* ============================
+   SMOOTH INTERACTIVE DEFAULTS
+   ============================ */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
