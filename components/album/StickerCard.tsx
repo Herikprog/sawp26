@@ -55,17 +55,29 @@ export default function StickerCard({ sticker, quantity, onUpdate, isEditMode, r
   async function updateQty(diff: number) {
     const newQty = Math.max(0, quantity + diff);
     if (newQty === quantity) return;
+    
+    // Atualização otimista na interface
     onUpdate?.(sticker.id, newQty);
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      toast.error("Precisas de iniciar sessão para salvar no álbum!");
+      return;
+    }
 
-    await supabase.from("user_stickers").upsert({
+    const { error } = await supabase.from("user_stickers").upsert({
       user_id: user.id,
       sticker_id: sticker.id,
       quantity: newQty,
       updated_at: new Date().toISOString()
-    }, { onConflict: "user_id, sticker_id" });
+    }, { onConflict: "user_id,sticker_id" });
+
+    if (error) {
+      console.error("Erro ao salvar quantidade:", error);
+      toast.error("Erro ao salvar no álbum: " + error.message);
+      // Reverte o valor na UI em caso de falha física no banco
+      onUpdate?.(sticker.id, quantity);
+    }
   }
 
   const handleCardClick = () => {
