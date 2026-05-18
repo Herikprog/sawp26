@@ -13,12 +13,25 @@ export default async function ChatListPage() {
     .from("conversations")
     .select(`
       id,
-      updated_at,
+      last_msg_at,
+      created_at,
       user_a:profiles!user_a_id (id, nome, avatar_url, is_online),
       user_b:profiles!user_b_id (id, nome, avatar_url, is_online)
     `)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .order("updated_at", { ascending: false });
+    .order("last_msg_at", { ascending: false, nullsFirst: false });
+
+  // Fetch unread counts for all conversations
+  const { data: unreadMessages } = await supabase
+    .from("messages")
+    .select("conversation_id")
+    .eq("read", false)
+    .not("sender_id", "eq", user.id);
+
+  const unreadCounts: Record<string, number> = {};
+  unreadMessages?.forEach(m => {
+    unreadCounts[m.conversation_id] = (unreadCounts[m.conversation_id] || 0) + 1;
+  });
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "48px 24px" }}>
@@ -55,7 +68,7 @@ export default async function ChatListPage() {
         ) : (
           conversations.map((conv: any) => {
             const other = conv.user_a.id === user.id ? conv.user_b : conv.user_a;
-            const timeAgo = new Date(conv.updated_at).toLocaleDateString("pt-PT", {
+            const timeAgo = new Date(conv.last_msg_at || conv.created_at).toLocaleDateString("pt-PT", {
               day: "numeric", month: "short",
             });
 
@@ -109,10 +122,21 @@ export default async function ChatListPage() {
                   </p>
                 </div>
 
-                {/* Time */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Clock size={14} style={{ color: "var(--text-muted)" }} />
-                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{timeAgo}</span>
+                {/* Time & Badge */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Clock size={14} style={{ color: "var(--text-muted)" }} />
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{timeAgo}</span>
+                  </div>
+                  {unreadCounts[conv.id] > 0 && (
+                    <div style={{
+                      background: "var(--danger)", color: "#fff",
+                      fontSize: 11, fontWeight: 800, padding: "2px 8px",
+                      borderRadius: 10, boxShadow: "0 2px 8px rgba(255,77,106,0.4)"
+                    }}>
+                      {unreadCounts[conv.id]}
+                    </div>
+                  )}
                 </div>
               </Link>
             );

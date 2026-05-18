@@ -58,7 +58,7 @@ function Avatar({ user, size = 44 }: { user?: any; size?: number }) {
       color: "var(--primary)", fontWeight: 800, fontSize: size * 0.38
     }}>
       {user?.avatar_url
-        ? <Image src={user.avatar_url} alt={user.nome || "User"} width={size} height={size} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+        ? <Image src={user.avatar_url} alt={user.nome || "User"} width={size} height={size} style={{ objectFit: "cover", width: "100%", height: "auto" }} />
         : (user?.nome?.[0]?.toUpperCase() || "U")
       }
     </div>
@@ -117,14 +117,29 @@ function PostCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
       style={{
-        background: isReply ? "rgba(255,255,255,0.015)" : "var(--card-bg)",
-        borderRadius: isReply ? 0 : 20,
+        background: isReply ? "transparent" : "var(--card-bg)",
+        borderRadius: isReply ? 0 : 24,
         border: isReply ? "none" : "1px solid var(--border-color)",
-        borderBottom: isReply ? "1px solid rgba(255,255,255,0.05)" : undefined,
-        padding: isReply ? "16px 0 16px 60px" : "20px",
-        marginLeft: isReply ? 22 : 0,
+        borderBottom: isReply ? "1px solid var(--border-light)" : undefined,
+        padding: isReply ? "16px 0 16px 58px" : "24px",
+        marginLeft: isReply ? 24 : 0,
         position: "relative",
-        transition: "border-color 0.2s"
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        boxShadow: isReply ? "none" : "var(--shadow-sm)",
+      }}
+      onMouseEnter={(e) => {
+        if (!isReply) {
+          e.currentTarget.style.borderColor = "var(--primary-light-strong)";
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "var(--shadow-md)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isReply) {
+          e.currentTarget.style.borderColor = "var(--border-color)";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "var(--shadow-sm)";
+        }
       }}
     >
       {/* Repost indicator */}
@@ -142,7 +157,7 @@ function PostCard({
       <div style={{ display: "flex", gap: 14 }}>
         {/* Avatar column */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <Link href={`/u/${post.user?.username}`} style={{ textDecoration: "none" }}>
+          <Link href={`/profile/${post.user_id}`} style={{ textDecoration: "none" }}>
             <Avatar user={post.user} size={isReply ? 36 : 44} />
           </Link>
           {/* Thread line */}
@@ -156,14 +171,14 @@ function PostCard({
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <Link href={`/u/${post.user?.username}`} style={{ textDecoration: "none" }}>
+              <Link href={`/profile/${post.user_id}`} style={{ textDecoration: "none" }}>
                 <span style={{ fontWeight: 800, color: "var(--text-main)", fontSize: 15 }} className="hover:underline">
                   {post.user?.nome || "Utilizador"}
                 </span>
               </Link>
-              <Link href={`/u/${post.user?.username}`} style={{ textDecoration: "none" }}>
+              <Link href={`/profile/${post.user_id}`} style={{ textDecoration: "none" }}>
                 <span style={{ color: "var(--text-muted)", fontSize: 14 }}>
-                  @{post.user?.username}
+                  @{post.user?.username || "user"}
                 </span>
               </Link>
               <span style={{ color: "var(--text-muted)", fontSize: 13 }}>·</span>
@@ -409,6 +424,10 @@ export default function FeedList({
   const mainPosts = allPosts.filter(p => !p.parent_id && !p.repost_id)
     .concat(allPosts.filter(p => !p.parent_id && !!p.repost_id))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  useEffect(() => {
+    setAllPosts(initialPosts);
+  }, [initialPosts]);
 
   // ── Load and sync likes ──
   useEffect(() => {

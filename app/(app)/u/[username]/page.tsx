@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import { MapPin, User, Star, MessageSquare } from "lucide-react";
 import FeedList from "@/components/feed/FeedList";
-import FollowButton from "./FollowButton";
+import FollowButton from "@/components/profile/FollowButton";
 
 export const revalidate = 0;
 

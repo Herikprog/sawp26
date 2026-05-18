@@ -47,7 +47,18 @@ export default function NotificationsPopup({ onClose }: { onClose: () => void })
       }
       setLoading(false);
     }
+
     loadNotifications();
+
+    const channel = supabase.channel('popup-notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_notifications' }, () => {
+        loadNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [supabase]);
 
   function getNotificationContent(n: any) {
@@ -57,6 +68,7 @@ export default function NotificationsPopup({ onClose }: { onClose: () => void })
       case "repost": return { icon: <Repeat2 size={12} color="var(--success)" />, text: <span><b>{actorName}</b> republicou.</span> };
       case "reply": return { icon: <MessageSquare size={12} color="var(--primary)" />, text: <span><b>{actorName}</b> respondeu-te.</span> };
       case "follow": return { icon: <UserPlus size={12} color="#8b5cf6" />, text: <span><b>{actorName}</b> seguiu-te.</span> };
+      case "trade": return { icon: <Repeat2 size={12} color="var(--warning)" />, text: <span><b>{actorName}</b> propôs-te uma troca de figurinhas!</span> };
       default: return { icon: <Bell size={12} />, text: <span>Nova notificação de <b>{actorName}</b>.</span> };
     }
   }
@@ -85,7 +97,7 @@ export default function NotificationsPopup({ onClose }: { onClose: () => void })
         ) : (
           notifications.map(n => {
             const { icon, text } = getNotificationContent(n);
-            const linkHref = n.type === "follow" ? `/u/${n.actor?.username}` : (n.post_id ? `/feed#post-${n.post_id}` : "#");
+            const linkHref = n.type === "follow" ? `/profile/${n.actor?.id}` : (n.post_id ? `/feed#post-${n.post_id}` : "#");
             return (
               <Link key={n.id} href={linkHref} onClick={onClose} style={{
                 display: "flex", gap: 12, padding: "12px", textDecoration: "none", color: "inherit",

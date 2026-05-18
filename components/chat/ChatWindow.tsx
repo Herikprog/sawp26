@@ -21,6 +21,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -28,42 +29,79 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   }, [messages, isTyping]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`chat:${conversationId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload: any) => {
-          const newMsg = payload.new as Message;
-          if (newMsg.sender_id !== myUserId) {
-            setMessages((prev) => [...prev, newMsg]);
-          }
-        }
-      )
-      .subscribe();
+    const channel = supabase.channel(`room:${conversationId}`, {
+      config: {
+        broadcast: { ack: true, self: false },
+        presence: { key: myUserId },
+      },
+    });
 
-    const presence = supabase.channel(`presence:${conversationId}`);
-    presence.on("presence", { event: "sync" }, () => {
-      const state = presence.presenceState();
-      const typingUsers = Object.values(state).flat().filter((u: any) => u.typing && u.user_id !== myUserId);
-      setIsTyping(typingUsers.length > 0);
-    });
-    presence.subscribe(async (status: string) => {
-      if (status === "SUBSCRIBED") {
-        await presence.track({ user_id: myUserId, typing: false });
-      }
-    });
+    channel
+      .on("broadcast", { event: "new_message" }, (payload) => {
+        const newMsg = payload.payload as Message;
+        if (newMsg.sender_id !== myUserId) {
+          setMessages((prev) => {
+            if (prev.find((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+        }
+      })
+      .on("broadcast", { event: "messages_read" }, (payload) => {
+        const { conversationId: cid, readerId } = payload.payload;
+        if (cid === conversationId && readerId !== myUserId) {
+          setMessages(prev => prev.map(m => 
+            m.sender_id === myUserId ? { ...m, read: true } : m
+          ));
+        }
+      })
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const typingUsers = Object.values(state).flat().filter((u: any) => u.typing && u.user_id !== myUserId);
+        setIsTyping(typingUsers.length > 0);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          channelRef.current = channel;
+          await channel.track({ user_id: myUserId, typing: false });
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
-      supabase.removeChannel(presence);
+      channelRef.current = null;
     };
   }, [conversationId, myUserId, supabase]);
 
+  // Mark as read when messages arrive or window opens
+  useEffect(() => {
+    async function markAsRead() {
+      const hasUnread = messages.some(m => !m.read && m.sender_id !== myUserId);
+      if (hasUnread) {
+        await supabase
+          .from("messages")
+          .update({ read: true })
+          .eq("conversation_id", conversationId)
+          .not("sender_id", "eq", myUserId)
+          .eq("read", false);
+        
+        // Broadcast that I read the messages
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: "broadcast",
+            event: "messages_read",
+            payload: { conversationId, readerId: myUserId }
+          });
+        }
+      }
+    }
+    markAsRead();
+  }, [messages, conversationId, myUserId, supabase]);
+
   async function handleTyping(val: string) {
     setInput(val);
-    const presence = supabase.channel(`presence:${conversationId}`);
-    await presence.track({ user_id: myUserId, typing: val.length > 0 });
+    if (channelRef.current) {
+      await channelRef.current.track({ user_id: myUserId, typing: val.length > 0 });
+    }
   }
 
   async function sendMessage(e: React.FormEvent) {
@@ -73,24 +111,47 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     const content = input.trim();
     setInput("");
     
-    const tempMsg: Message = {
-      id: crypto.randomUUID(),
+    // Create optimistic message for instant UI feedback
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId as any,
       conversation_id: conversationId,
       sender_id: myUserId,
       content,
       read: false,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, tempMsg]);
+    
+    setMessages((prev) => [...prev, optimisticMsg]);
 
-    const presence = supabase.channel(`presence:${conversationId}`);
-    await presence.track({ user_id: myUserId, typing: false });
-
-    await supabase.from("messages").insert({
+    // Save to database
+    const { data: savedMsg, error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender_id: myUserId,
       content,
-    });
+    }).select().single();
+
+    if (error || !savedMsg) {
+      console.error("Failed to save message error details:", JSON.stringify(error, null, 2));
+      console.error("Full error object:", error);
+      // Remove optimistic message if failed
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      return;
+    }
+
+    // Replace optimistic message with real message
+    setMessages((prev) => prev.map((m) => m.id === tempId ? savedMsg : m));
+
+    // Broadcast the REAL message to the other user
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "new_message",
+        payload: savedMsg,
+      }).catch(console.error);
+      
+      channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
+    }
   }
 
   return (

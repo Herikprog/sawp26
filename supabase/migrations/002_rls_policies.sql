@@ -80,9 +80,15 @@ CREATE POLICY "msg_insert_sender"
   ON messages FOR INSERT
   WITH CHECK (auth.uid() = sender_id);
 
-CREATE POLICY "msg_update_sender"
+CREATE POLICY "msg_update_participant"
   ON messages FOR UPDATE
-  USING (auth.uid() = sender_id);
+  USING (
+    EXISTS (
+      SELECT 1 FROM conversations c
+      WHERE c.id = conversation_id
+        AND (c.user_a_id = auth.uid() OR c.user_b_id = auth.uid())
+    )
+  );
 
 -- ============================================================
 -- SUBSCRIPTIONS

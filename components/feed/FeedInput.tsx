@@ -107,10 +107,12 @@ export default function FeedInput({ userProfile, replyTo, onReplyCancel, onPoste
   return (
     <div style={{
       background: compact ? "transparent" : "var(--card-bg)",
-      borderRadius: compact ? 0 : 20,
+      borderRadius: compact ? 0 : 24,
       border: compact ? "none" : "1px solid var(--border-color)",
-      padding: compact ? "16px 0" : "20px",
-      marginBottom: compact ? 0 : 24,
+      padding: compact ? "16px 0" : "24px",
+      marginBottom: compact ? 0 : 28,
+      boxShadow: compact ? "none" : "var(--shadow-sm)",
+      transition: "all 0.3s ease",
     }}>
       {replyTo && (
         <div style={{
@@ -137,7 +139,7 @@ export default function FeedInput({ userProfile, replyTo, onReplyCancel, onPoste
           border: "2px solid var(--border-color)"
         }}>
           {userProfile?.avatar_url
-            ? <Image src={userProfile.avatar_url} alt="Avatar" width={46} height={46} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+            ? <Image src={userProfile.avatar_url} alt="Avatar" width={46} height={46} style={{ objectFit: "cover", width: "100%", height: "auto" }} />
             : avatarLetter
           }
         </div>
@@ -223,12 +225,13 @@ export default function FeedInput({ userProfile, replyTo, onReplyCancel, onPoste
                 onClick={handlePost}
                 disabled={isSubmitting || !content.trim() || isOverLimit}
                 style={{
-                  background: isSubmitting || !content.trim() || isOverLimit ? "var(--input-bg)" : "var(--primary)",
+                  background: isSubmitting || !content.trim() || isOverLimit ? "var(--input-bg)" : "var(--gradient-primary)",
                   color: isSubmitting || !content.trim() || isOverLimit ? "var(--text-muted)" : "white",
-                  fontWeight: 700, padding: compact ? "7px 18px" : "9px 22px",
-                  borderRadius: 100, border: "none", cursor: isSubmitting || !content.trim() || isOverLimit ? "not-allowed" : "pointer",
-                  display: "flex", alignItems: "center", gap: 7, fontSize: 14,
-                  transition: "all 0.2s ease"
+                  fontWeight: 700, padding: compact ? "8px 20px" : "12px 28px",
+                  borderRadius: 14, border: "none", cursor: isSubmitting || !content.trim() || isOverLimit ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", gap: 8, fontSize: 14,
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  boxShadow: isSubmitting || !content.trim() || isOverLimit ? "none" : "0 8px 24px -4px rgba(0, 153, 255, 0.3)",
                 }}
               >
                 {isSubmitting ? "A publicar..." : <><Send size={14} /> {replyTo ? "Responder" : "Postar"}</>}

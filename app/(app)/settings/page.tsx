@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Lock, Moon, Sun, Smartphone, ChevronRight, LogOut, Users, Shield, Globe } from "lucide-react";
+import { Bell, Lock, Moon, Sun, Smartphone, ChevronRight, LogOut, Users, Shield, Globe, Settings as SettingsIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -58,9 +58,9 @@ export default function SettingsPage() {
         onClick={onChange}
         style={{
           width: 46, height: 26, borderRadius: 13, border: "none",
-          background: value ? "var(--primary)" : "var(--input-bg)",
-          position: "relative", cursor: "pointer", transition: "background 0.25s ease",
-          flexShrink: 0
+          background: value ? "var(--gradient-primary)" : "var(--input-bg)",
+          position: "relative", cursor: "pointer", transition: "background 0.3s ease",
+          flexShrink: 0, boxShadow: value ? "0 4px 12px rgba(0,153,255,0.2)" : "none",
         }}
         aria-checked={value}
         role="switch"
@@ -69,8 +69,8 @@ export default function SettingsPage() {
           width: 20, height: 20, borderRadius: 10,
           background: "white", position: "absolute", top: 3,
           left: value ? 23 : 3,
-          transition: "left 0.2s ease",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.2)"
+          transition: "left 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
         }} />
       </button>
     );
@@ -89,7 +89,8 @@ export default function SettingsPage() {
         onClick={onClick}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 20px", gap: 16, cursor: onClick ? "pointer" : "default"
+          padding: "16px 20px", gap: 14, cursor: onClick ? "pointer" : "default",
+          transition: "background 0.2s ease",
         }}
         className={onClick ? "hover-row" : ""}
       >
@@ -97,13 +98,13 @@ export default function SettingsPage() {
           <div style={{
             width: 40, height: 40, borderRadius: 12,
             background: iconBg, display: "flex",
-            alignItems: "center", justifyContent: "center", flexShrink: 0
+            alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            <Icon size={18} style={{ color: iconColor }} />
+            <Icon size={17} style={{ color: iconColor }} />
           </div>
           <div>
             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-main)", marginBottom: 2 }}>{label}</p>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>{desc}</p>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4 }}>{desc}</p>
           </div>
         </div>
         {right}
@@ -116,13 +117,14 @@ export default function SettingsPage() {
       <div>
         <p style={{
           fontSize: 10, fontWeight: 800, textTransform: "uppercase",
-          letterSpacing: "0.15em", color: "var(--text-muted)", marginBottom: 10, paddingLeft: 4
+          letterSpacing: "0.15em", color: "var(--text-muted)", marginBottom: 10, paddingLeft: 4,
         }}>
           {title}
         </p>
         <div style={{
           background: "var(--card-bg)", borderRadius: 20,
-          border: "1px solid var(--border-color)", overflow: "hidden"
+          border: "1px solid var(--border-color)", overflow: "hidden",
+          boxShadow: "var(--shadow-sm)",
         }}>
           {children}
         </div>
@@ -130,25 +132,31 @@ export default function SettingsPage() {
     );
   }
 
-  const Divider = () => <div style={{ height: 1, background: "var(--border-color)", margin: "0 20px" }} />;
+  const Divider = () => <div style={{ height: 1, background: "var(--border-light)", margin: "0 20px" }} />;
 
   // Prevent hydration mismatch on theme
   if (!mounted) return null;
   const isDark = theme === "dark";
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px", paddingBottom: 100 }}>
+    <div className="pattern-bg" style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px", paddingBottom: 100, position: "relative" }}>
+      {/* Ambient */}
+      <div className="orb" style={{ top: -100, left: -60, width: 300, height: 300, background: "var(--secondary)", opacity: 0.03 }} />
+
       {/* Header */}
-      <div style={{ marginBottom: 36 }}>
-        <p style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-muted)", marginBottom: 8 }}>
-          Configuração
-        </p>
+      <div style={{ marginBottom: 36, position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <SettingsIcon size={14} style={{ color: "var(--text-muted)" }} />
+          <p style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-muted)" }}>
+            Configuração
+          </p>
+        </div>
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.03em" }}>
           Definições
         </h1>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 22, position: "relative", zIndex: 1 }}>
 
         {/* ─── Conta ─── */}
         <SectionCard title="Conta">
@@ -161,8 +169,8 @@ export default function SettingsPage() {
               iconBg="var(--primary-light)"
               right={
                 <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)" }}>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>Editar</span>
-                  <ChevronRight size={16} />
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>Editar</span>
+                  <ChevronRight size={14} />
                 </div>
               }
             />
@@ -188,19 +196,19 @@ export default function SettingsPage() {
           <Row
             icon={isDark ? Moon : Sun}
             label="Tema"
-            desc={isDark ? "Modo escuro ativo — Clica para mudar para claro" : "Modo claro ativo — Clica para mudar para escuro"}
-            iconColor={isDark ? "#8b5cf6" : "var(--warning)"}
-            iconBg={isDark ? "rgba(139,92,246,0.12)" : "var(--warning-light)"}
+            desc={isDark ? "Modo escuro ativo — Clica para mudar" : "Modo claro ativo — Clica para mudar"}
+            iconColor={isDark ? "#8B7BF7" : "var(--warning)"}
+            iconBg={isDark ? "rgba(139,123,247,0.12)" : "var(--warning-light)"}
             onClick={() => setTheme(isDark ? "light" : "dark")}
             right={
               <button
                 style={{
                   background: "var(--input-bg)", border: "1px solid var(--border-color)",
                   borderRadius: 10, padding: "6px 14px", cursor: "pointer", pointerEvents: "none",
-                  fontSize: 13, fontWeight: 700, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 6
+                  fontSize: 12, fontWeight: 700, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 6,
                 }}
               >
-                {isDark ? <><Sun size={14} /> Claro</> : <><Moon size={14} /> Escuro</>}
+                {isDark ? <><Sun size={13} /> Claro</> : <><Moon size={13} /> Escuro</>}
               </button>
             }
           />
@@ -213,7 +221,7 @@ export default function SettingsPage() {
             label="Privacidade"
             desc="Controla quem pode ver a tua localização"
             onClick={() => handleComingSoon("Privacidade")}
-            right={<ChevronRight size={16} style={{ color: "var(--text-muted)" }} />}
+            right={<ChevronRight size={14} style={{ color: "var(--text-muted)" }} />}
           />
           <Divider />
           <Row
@@ -221,7 +229,7 @@ export default function SettingsPage() {
             label="Segurança"
             desc="Gerir palavra-passe e sessões ativas"
             onClick={() => handleComingSoon("Segurança")}
-            right={<ChevronRight size={16} style={{ color: "var(--text-muted)" }} />}
+            right={<ChevronRight size={14} style={{ color: "var(--text-muted)" }} />}
           />
         </SectionCard>
 
@@ -234,9 +242,10 @@ export default function SettingsPage() {
             onClick={handleInstallApp}
             right={
               <span style={{
-                fontSize: 10, fontWeight: 800, color: "var(--primary)",
+                fontSize: 9, fontWeight: 800, color: "var(--primary)",
                 background: "var(--primary-light)", padding: "4px 10px",
-                borderRadius: 8, textTransform: "uppercase", whiteSpace: "nowrap"
+                borderRadius: 8, textTransform: "uppercase", whiteSpace: "nowrap",
+                border: "1px solid var(--primary-light-strong)",
               }}>
                 PWA
               </span>
@@ -250,20 +259,22 @@ export default function SettingsPage() {
           style={{
             width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
             padding: "15px", borderRadius: 16,
-            background: "transparent", border: "1px solid rgba(238,50,78,0.25)",
+            background: "var(--danger-light)", border: "1px solid rgba(255,77,106,0.15)",
             color: "var(--danger)", fontWeight: 700, fontSize: 14,
-            cursor: "pointer", transition: "all 0.2s ease",
+            cursor: "pointer", transition: "all 0.25s ease",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(238,50,78,0.08)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,77,106,0.12)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "var(--danger-light)"; }}
         >
-          <LogOut size={18} />
+          <LogOut size={16} />
           Terminar Sessão
         </button>
 
         {/* Version */}
         <div style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 11, color: "var(--text-muted)" }}>Swap26 — Copa do Mundo 2026 · v1.2.0</p>
+          <p style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            Swap26 — Copa do Mundo 2026 · v2.0.0
+          </p>
         </div>
 
       </div>
