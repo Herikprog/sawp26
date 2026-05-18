@@ -55,6 +55,17 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const [myInventory, setMyInventory] = useState<Record<string, number>>({});
   const [myDuplicates, setMyDuplicates] = useState<{ codigo: string; quantity: number }[]>([]);
   const [manualCode, setManualCode] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -124,24 +135,44 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           .eq("id", tradeId)
           .single();
 
-        if (error || !trade) return;
+        if (error) {
+          toast.error(`Erro ao carregar chamada de troca: ${error.message}`);
+          return;
+        }
+        if (!trade) {
+          toast.error("A chamada de troca não foi encontrada no banco de dados.");
+          return;
+        }
 
         // Se o status da troca não for pending ou accepted, não abrir
-        if (trade.status !== "pending" && trade.status !== "accepted") return;
+        if (trade.status !== "pending" && trade.status !== "accepted") {
+          toast.error(`Chamada de troca ignorada: status é '${trade.status}'`);
+          return;
+        }
 
         const offeredIds = trade.offered_stickers || [];
         const wantedIds = trade.wanted_stickers || [];
 
         // Traduzir IDs das figurinhas para códigos
         const allIds = [...offeredIds, ...wantedIds];
-        if (allIds.length === 0) return;
+        if (allIds.length === 0) {
+          toast.error("A chamada de troca não contém figurinhas vinculadas.");
+          return;
+        }
 
-        const { data: stickers } = await supabase
+        const { data: stickers, error: stickersErr } = await supabase
           .from("stickers")
           .select("id, codigo")
           .in("id", allIds);
 
-        if (!stickers) return;
+        if (stickersErr) {
+          toast.error(`Erro ao carregar figurinhas da proposta: ${stickersErr.message}`);
+          return;
+        }
+        if (!stickers) {
+          toast.error("Falha ao mapear figurinhas.");
+          return;
+        }
 
         const idToCode: Record<number, string> = {};
         stickers.forEach((s: any) => {
@@ -678,7 +709,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: "100%", maxWidth: 800,
+      display: "flex", flexDirection: "column", height: isMobile ? "100dvh" : "100%", maxWidth: isMobile ? "100%" : 800,
       margin: "0 auto", width: "100%", background: "var(--bg-main)", position: "relative"
     }}>
       {/* Header do Chat */}
@@ -733,13 +764,13 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             onClick={startTrade}
             style={{ 
               background: "var(--gradient-primary)", border: "none", color: "#fff", 
-              padding: "8px 16px", borderRadius: 12, cursor: "pointer", 
+              padding: isMobile ? "8px 12px" : "8px 16px", borderRadius: 12, cursor: "pointer", 
               fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
               boxShadow: "0 4px 15px rgba(0,174,239,0.2)"
             }}
           >
             <Shuffle size={14} />
-            Propor Troca
+            {!isMobile && "Propor Troca"}
           </button>
           
           <button style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: 8, cursor: "pointer" }}>
@@ -759,21 +790,23 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             style={{
-              position: "absolute", top: 77, left: 0, right: 0, bottom: 0,
-              background: "rgba(7, 17, 31, 0.95)", backdropFilter: "blur(20px)",
-              zIndex: 50, padding: 24, display: "flex", flexDirection: "column",
+              position: "absolute", top: isMobile ? 68 : 77, left: 0, right: 0, bottom: 0,
+              background: "rgba(7, 17, 31, 0.98)", backdropFilter: "blur(20px)",
+              zIndex: 50, padding: isMobile ? 12 : 24, display: "flex", flexDirection: "column",
               borderTop: "1px solid rgba(255, 255, 255, 0.05)"
             }}
           >
             {/* Header da modal */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isMobile ? 12 : 20 }}>
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
-                  <Shuffle size={18} style={{ color: "var(--primary)" }} /> Negociação de Figurinhass em Tempo Real
+                <h3 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+                  <Shuffle size={16} style={{ color: "var(--primary)" }} /> Negociação em Tempo Real
                 </h3>
-                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0 0" }}>
-                  Adicione as figurinhas que deseja oferecer e veja o que {otherUser.nome.split(" ")[0]} está oferecendo.
-                </p>
+                {!isMobile && (
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0 0" }}>
+                    Adicione as figurinhas que deseja oferecer e veja o que {otherUser.nome.split(" ")[0]} está oferecendo.
+                  </p>
+                )}
               </div>
               <button 
                 onClick={cancelTrade}
@@ -796,25 +829,32 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             )}
 
             {/* Colunas Duplas de Negociação */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, flex: 1, overflow: "hidden", marginBottom: 20 }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+              gap: isMobile ? 12 : 20,
+              flex: 1,
+              overflowY: "auto",
+              marginBottom: 16
+            }}>
               
               {/* Painel Esquerdo: Minhas Ofertas */}
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>Tu Ofereces</h4>
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: isMobile ? 12 : 18, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>Tu Ofereces</h4>
                   {tradeSession.myAccepted ? (
-                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(46,204,113,0.15)", color: "#2ecc71", padding: "4px 10px", borderRadius: 100 }}>ACEITE PRONTO</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, background: "rgba(46,204,113,0.15)", color: "#2ecc71", padding: "4px 8px", borderRadius: 100 }}>ACEITE PRONTO</span>
                   ) : (
-                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", padding: "4px 10px", borderRadius: 100 }}>EM CONSTRUÇÃO</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", padding: "4px 8px", borderRadius: 100 }}>EM CONSTRUÇÃO</span>
                   )}
                 </div>
 
                 {/* Seletor Rápido de Duplicadas */}
-                <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Minhas Figurinhass Repetidas:</p>
-                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Minhas figurinhas Repetidas:</p>
+                  <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
                     {myDuplicates.length === 0 ? (
-                      <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>Nenhuma figurinha repetida no seu álbum.</span>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>Nenhuma figurinha repetida no seu álbum.</span>
                     ) : (
                       myDuplicates.map(item => {
                         const inOffer = tradeSession.myOffers.find(o => o.codigo === item.codigo);
@@ -827,11 +867,11 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                             disabled={available <= 0}
                             onClick={() => addStickerToOffer(item.codigo)}
                             style={{
-                              flexShrink: 0, padding: "6px 12px", borderRadius: 10,
+                              flexShrink: 0, padding: "5px 10px", borderRadius: 8,
                               background: available <= 0 ? "rgba(255,255,255,0.02)" : "var(--input-bg)",
                               color: available <= 0 ? "rgba(255,255,255,0.1)" : "var(--text-main)",
                               border: "1px solid rgba(255,255,255,0.08)", cursor: available <= 0 ? "default" : "pointer",
-                              fontSize: 12, fontWeight: 700
+                              fontSize: 11, fontWeight: 700
                             }}
                           >
                             {item.codigo} <span style={{ color: "var(--warning)", marginLeft: 2 }}>x{item.quantity}</span>
@@ -843,45 +883,45 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 </div>
 
                 {/* Input Manual Opcional */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                   <input
                     type="text"
                     placeholder="Código (Ex: BRA-1)"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                    style={{ flex: 1, background: "var(--input-bg)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px", color: "var(--text-main)", fontSize: 13, outline: "none" }}
+                    style={{ flex: 1, background: "var(--input-bg)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "6px 10px", color: "var(--text-main)", fontSize: 12, outline: "none" }}
                   />
                   <button
                     onClick={() => addStickerToOffer(manualCode)}
-                    style={{ background: "var(--primary)", border: "none", color: "#fff", width: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                    style={{ background: "var(--primary)", border: "none", color: "#fff", width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
                   >
-                    <Plus size={16} />
+                    <Plus size={14} />
                   </button>
                 </div>
 
                 {/* Lista de figurinhas oferecidas */}
-                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, minHeight: 120 }}>
                   {tradeSession.myOffers.length === 0 ? (
-                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 14 }}>
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 12, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 80 }}>
                       Nenhuma figurinha oferecida.
                     </div>
                   ) : (
                     tradeSession.myOffers.map(offer => {
                       const maxQty = (myInventory[offer.codigo] || 0) - 1; // restringe manter pelo menos 1
                       return (
-                        <div key={offer.codigo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "10px 14px", borderRadius: 12 }}>
+                        <div key={offer.codigo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "8px 12px", borderRadius: 10 }}>
                           <div>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>{offer.codigo}</span>
-                            <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 8 }}>Tenho: {myInventory[offer.codigo] || 0}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-main)" }}>{offer.codigo}</span>
+                            <span style={{ fontSize: 9, color: "var(--text-muted)", marginLeft: 6 }}>Disponível: {maxQty + 1}</span>
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--input-bg)", borderRadius: 8, padding: "2px 6px" }}>
-                              <button onClick={() => updateOfferQuantity(offer.codigo, -1)} style={{ background: "transparent", border: "none", color: "var(--text-sec)", cursor: "pointer", fontSize: 14, fontWeight: "bold" }}>-</button>
-                              <span style={{ fontSize: 13, fontWeight: 700, minWidth: 16, textAlign: "center", color: "var(--text-main)" }}>{offer.quantity}</span>
-                              <button onClick={() => updateOfferQuantity(offer.codigo, 1)} style={{ background: "transparent", border: "none", color: "var(--text-sec)", cursor: "pointer", fontSize: 14, fontWeight: "bold" }}>+</button>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--input-bg)", borderRadius: 6, padding: "2px 4px" }}>
+                              <button onClick={() => updateOfferQuantity(offer.codigo, -1)} style={{ background: "transparent", border: "none", color: "var(--text-sec)", cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>-</button>
+                              <span style={{ fontSize: 12, fontWeight: 700, minWidth: 12, textAlign: "center", color: "var(--text-main)" }}>{offer.quantity}</span>
+                              <button onClick={() => updateOfferQuantity(offer.codigo, 1)} style={{ background: "transparent", border: "none", color: "var(--text-sec)", cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>+</button>
                             </div>
                             <button onClick={() => removeStickerFromOffer(offer.codigo)} style={{ background: "transparent", border: "none", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center" }}>
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </div>
@@ -892,27 +932,27 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               </div>
 
               {/* Painel Direito: Ofertas de Outro Colecionador */}
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>{otherUser.nome.split(" ")[0]} Oferece</h4>
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: isMobile ? 12 : 18, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>{otherUser.nome.split(" ")[0]} Oferece</h4>
                   {tradeSession.otherAccepted ? (
-                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(46,204,113,0.15)", color: "#2ecc71", padding: "4px 10px", borderRadius: 100 }}>ACEITE PRONTO</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, background: "rgba(46,204,113,0.15)", color: "#2ecc71", padding: "4px 8px", borderRadius: 100 }}>ACEITE PRONTO</span>
                   ) : (
-                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", padding: "4px 10px", borderRadius: 100 }}>EM CONSTRUÇÃO</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", padding: "4px 8px", borderRadius: 100 }}>EM CONSTRUÇÃO</span>
                   )}
                 </div>
 
                 {/* Lista de figurinhas oferecidas pelo outro */}
-                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, minHeight: 120 }}>
                   {tradeSession.otherOffers.length === 0 ? (
-                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 14 }}>
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 12, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 80 }}>
                       Nenhuma figurinha oferecida por {otherUser.nome.split(" ")[0]} ainda.
                     </div>
                   ) : (
                     tradeSession.otherOffers.map(offer => (
-                      <div key={offer.codigo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "12px 16px", borderRadius: 12 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>{offer.codigo}</span>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: "var(--warning)", background: "rgba(245,183,0,0.1)", padding: "4px 10px", borderRadius: 8 }}>
+                      <div key={offer.codigo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 10 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-main)" }}>{offer.codigo}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "var(--warning)", background: "rgba(245,183,0,0.1)", padding: "3px 8px", borderRadius: 6 }}>
                           Qtd: {offer.quantity}
                         </span>
                       </div>
@@ -923,9 +963,9 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             </div>
 
             {/* Barra Inferior da Modal: Ações e Aceites */}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+            <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: 16, display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               {/* Status de Confirmação das Duas Partes */}
-              <div style={{ display: "flex", gap: 16 }}>
+              <div style={{ display: "flex", gap: 16, width: isMobile ? "100%" : "auto", justifyContent: isMobile ? "space-around" : "flex-start" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{
                     width: 18, height: 18, borderRadius: "50%", background: tradeSession.myAccepted ? "var(--success)" : "rgba(255,255,255,0.05)",
@@ -947,39 +987,51 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               </div>
 
               {/* Botões de Ação do Painel */}
-              <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", gap: 10, width: isMobile ? "100%" : "auto" }}>
                 <button
                   onClick={cancelTrade}
                   style={{
+                    flex: isMobile ? 1 : "none",
                     background: "rgba(255,77,106,0.1)", border: "1px solid rgba(255,77,106,0.2)",
                     color: "var(--danger)", padding: "12px 24px", borderRadius: 14,
-                    fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all 0.2s"
+                    fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.2s"
                   }}
                 >
                   Recusar / Sair
                 </button>
                 <button
-                  onClick={proposeTradeCall}
+                  onClick={toggleAccept}
                   disabled={tradeSession.isExecuting}
                   style={{
-                    background: tradeSession.isExecuting 
-                      ? "rgba(255,255,255,0.1)" 
-                      : "var(--gradient-primary)",
+                    flex: isMobile ? 1 : "none",
+                    background: tradeSession.isExecuting
+                      ? "rgba(255,255,255,0.1)"
+                      : tradeSession.myAccepted
+                        ? "var(--success)"
+                        : "var(--gradient-primary)",
                     color: "#fff",
-                    border: "none", padding: "12px 32px", borderRadius: 14,
-                    fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-                    boxShadow: "0 8px 24px -4px rgba(0,174,239,0.3)", transition: "all 0.3s ease"
+                    border: "none", padding: "12px 24px", borderRadius: 14,
+                    fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    boxShadow: tradeSession.myAccepted
+                      ? "0 8px 24px -4px rgba(46,204,113,0.3)"
+                      : "0 8px 24px -4px rgba(0,174,239,0.3)",
+                    transition: "all 0.3s ease"
                   }}
                 >
                   {tradeSession.isExecuting ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
-                      A Enviar Chamada...
+                      <Loader2 size={14} className="animate-spin" />
+                      Efetuando...
+                    </>
+                  ) : tradeSession.myAccepted ? (
+                    <>
+                      <Check size={14} />
+                      Desmarcar Aceite
                     </>
                   ) : (
                     <>
-                      <PhoneCall size={16} />
-                      Iniciar Chamada de Troca
+                      <Check size={14} />
+                      Aceitar Proposta
                     </>
                   )}
                 </button>
@@ -992,7 +1044,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       {/* Área de Mensagens do Chat */}
       <div 
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", padding: "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}
+        style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px 12px" : "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}
       >
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", marginTop: "20%" }}>
@@ -1045,7 +1097,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 style={{
                   alignSelf: isMe ? "flex-end" : "flex-start",
-                  maxWidth: "75%",
+                  maxWidth: isMobile ? "85%" : "70%",
                   display: "flex", flexDirection: "column",
                   alignItems: isMe ? "flex-end" : "flex-start"
                 }}
@@ -1093,9 +1145,9 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
  
       {/* Input de Mensagem */}
       <div style={{
-        padding: "24px", background: "var(--bg-main-transparent)",
+        padding: isMobile ? "12px" : "24px", background: "var(--bg-main-transparent)",
         backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-        paddingBottom: "max(24px, env(safe-area-inset-bottom))"
+        paddingBottom: `max(${isMobile ? "12px" : "24px"}, env(safe-area-inset-bottom))`
       }}>
         <form onSubmit={sendMessage} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
           <div style={{
