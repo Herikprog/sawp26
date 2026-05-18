@@ -1,15 +1,12 @@
 -- ============================================================
--- MIGRATION 009: FIX GET NEARBY MATCHES LOGIC
+-- MIGRATION 009: FIX GET NEARBY MATCHES LOGIC & GPS SUPPORT
 -- ============================================================
-
--- A função get_nearby_matches estava a assumir que as figurinhas faltantes 
--- tinham um registo na tabela user_stickers com quantity = 0.
--- No entanto, por omissão, se um utilizador não tem a figurinha,
--- simplesmente não existe registo na tabela.
 
 CREATE OR REPLACE FUNCTION get_nearby_matches(
   p_user_id   UUID,
-  p_radius_km FLOAT DEFAULT 10
+  p_radius_km FLOAT DEFAULT 10,
+  p_lat       FLOAT DEFAULT NULL,
+  p_lon       FLOAT DEFAULT NULL
 )
 RETURNS TABLE (
   user_id          UUID,
@@ -29,8 +26,24 @@ DECLARE
   v_location GEOGRAPHY;
   v_plano    TEXT;
 BEGIN
-  SELECT location, plano INTO v_location, v_plano
+  -- Obter plano do utilizador
+  SELECT plano INTO v_plano
   FROM profiles WHERE id = p_user_id;
+
+  -- Construir ou carregar a localização
+  IF p_lat IS NOT NULL AND p_lon IS NOT NULL THEN
+    -- Usar as coordenadas do navegador em tempo real
+    v_location := ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography;
+    
+    -- Atualizar o perfil do utilizador no banco em background
+    UPDATE profiles 
+    SET location = v_location, last_seen = NOW()
+    WHERE id = p_user_id;
+  ELSE
+    -- Fallback para a localização salva no perfil
+    SELECT location INTO v_location
+    FROM profiles WHERE id = p_user_id;
+  END IF;
 
   IF v_location IS NULL THEN
     RETURN;
@@ -60,15 +73,14 @@ BEGIN
     ARRAY(
       SELECT us.sticker_id FROM user_stickers us
       WHERE us.user_id = p.id AND us.quantity >= 1
-        AND us.sticker_id NOT IN (SELECT sticker_id FROM minhas_obtidas) -- Ele tem o que eu NÃO tenho
+        AND us.sticker_id NOT IN (SELECT sticker_id FROM minhas_obtidas)
     ),
     ARRAY(
       SELECT s.id FROM stickers s
-      WHERE s.id NOT IN (SELECT sticker_id FROM user_stickers WHERE user_id = p.id AND quantity >= 1) -- O que ele NÃO tem
-        AND s.id IN (SELECT sticker_id FROM minhas_repetidas) -- Mas eu tenho repetido
+      WHERE s.id NOT IN (SELECT sticker_id FROM user_stickers WHERE user_id = p.id AND quantity >= 1)
+        AND s.id IN (SELECT sticker_id FROM minhas_repetidas)
     ),
     (
-      -- Score = 10 pontos por cada figurinha que ele tem e eu preciso
       COALESCE(ARRAY_LENGTH(ARRAY(
         SELECT us.sticker_id FROM user_stickers us
         WHERE us.user_id = p.id AND us.quantity >= 1

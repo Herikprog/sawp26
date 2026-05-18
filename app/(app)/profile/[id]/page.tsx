@@ -296,7 +296,7 @@ export default async function PublicProfilePage({ params }: Props) {
       </div>
 
       {/* Album Section */}
-      <section style={{ marginTop: 64 }}>
+      <section id="album" style={{ marginTop: 64 }}>
         <header style={{ marginBottom: 24 }}>
           <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
             Álbum Completo

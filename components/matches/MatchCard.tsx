@@ -4,7 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import type { MatchResult } from "@/types";
 import { formatDistance } from "@/lib/utils";
-import { MessageCircle, Shuffle, Star, MapPin, ChevronRight, Zap, TrendingUp } from "lucide-react";
+import { MessageCircle, Shuffle, Star, MapPin, ChevronRight, Zap, TrendingUp, User, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
@@ -171,30 +171,79 @@ export default function MatchCard({ match, myUserId, index }: Props) {
           ))}
         </div>
 
-        {/* Primary Action */}
-        <button
-          onClick={openChat}
-          style={{
-            width: "100%", padding: "16px", borderRadius: 14,
-            background: "var(--gradient-primary)", color: "#fff", fontWeight: 700,
-            fontSize: 14, display: "flex", alignItems: "center",
-            justifyContent: "center", gap: 8, border: "none", cursor: "pointer",
-            boxShadow: "0 8px 24px -4px rgba(0,153,255,0.25)",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = "0 12px 32px -4px rgba(0,153,255,0.4)";
-            e.currentTarget.style.transform = "translateY(-1px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = "0 8px 24px -4px rgba(0,153,255,0.25)";
-            e.currentTarget.style.transform = "translateY(0)";
-          }}
-        >
-          <MessageCircle size={16} />
-          Iniciar Negociação
-          <ChevronRight size={14} />
-        </button>
+        {/* Actions Grid */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+          {/* Primary Action: Chat */}
+          <button
+            onClick={openChat}
+            style={{
+              width: "100%", padding: "14px", borderRadius: 14,
+              background: "var(--gradient-primary)", color: "#fff", fontWeight: 700,
+              fontSize: 14, display: "flex", alignItems: "center",
+              justifyContent: "center", gap: 8, border: "none", cursor: "pointer",
+              boxShadow: "0 8px 24px -4px rgba(0,153,255,0.25)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = "0 12px 32px -4px rgba(0,153,255,0.4)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = "0 8px 24px -4px rgba(0,153,255,0.25)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <MessageCircle size={16} />
+            Iniciar Negociação
+            <ChevronRight size={14} />
+          </button>
+
+          {/* Secondary Actions: Profile & Album */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <button
+              onClick={() => router.push(`/profile/${match.user_id}`)}
+              style={{
+                padding: "12px", borderRadius: 12,
+                background: "var(--input-bg)", color: "var(--text-main)", fontWeight: 600,
+                fontSize: 13, display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 6, border: "1px solid var(--border-color)", cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-hover)";
+                e.currentTarget.style.borderColor = "var(--primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "var(--input-bg)";
+                e.currentTarget.style.borderColor = "var(--border-color)";
+              }}
+            >
+              <User size={14} style={{ color: "var(--primary)" }} />
+              Ver Perfil
+            </button>
+            <button
+              onClick={() => router.push(`/profile/${match.user_id}#album`)}
+              style={{
+                padding: "12px", borderRadius: 12,
+                background: "var(--input-bg)", color: "var(--text-main)", fontWeight: 600,
+                fontSize: 13, display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 6, border: "1px solid var(--border-color)", cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-hover)";
+                e.currentTarget.style.borderColor = "var(--success)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "var(--input-bg)";
+                e.currentTarget.style.borderColor = "var(--border-color)";
+              }}
+            >
+              <BookOpen size={14} style={{ color: "var(--success)" }} />
+              Ver Álbum
+            </button>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
