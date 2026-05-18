@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   last_message TEXT,
   last_msg_at  TIMESTAMPTZ,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_a_id, user_b_id)
 );
 
