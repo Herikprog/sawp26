@@ -10,20 +10,55 @@ import Image from "next/image";
 import Link from "next/link";
 import { MessageCircle, Zap, MapPin, User } from "lucide-react";
 
-// Premium WC2026 Pin
-const customIcon = L.divIcon({
-  className: "custom-pin",
-  html: `
-    <div style="position: relative; width: 32px; height: 32px;">
-      <div style="position: absolute; inset: 0; background: #00AEEF; border-radius: 12px 12px 12px 2px; transform: rotate(-45deg); border: 2px solid #FFFFFF; box-shadow: 0 4px 15px rgba(0,174,239,0.4);"></div>
-      <div style="position: absolute; inset: 0; display: flex; items-center; justify-content: center; transform: rotate(0); z-index: 1;">
-        <span style="font-size: 14px;">⚽</span>
+import { createClient } from "@/lib/supabase/client";
+
+// Função para criar o pino premium do utilizador atual (verde pulsante com foto de perfil)
+function createCurrentUserIcon(avatarUrl: string | null, nome: string) {
+  const innerHtml = avatarUrl 
+    ? `<img src="${avatarUrl}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />`
+    : `<div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
+
+  return L.divIcon({
+    className: "my-profile-pin",
+    html: `
+      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
+        <!-- Anel pulsante de geolocalização ativa -->
+        <div class="pulse-glow" style="position: absolute; inset: -4px; background: #10b981; border-radius: 50%; opacity: 0.35;"></div>
+        <!-- Pointer drop verde emerald -->
+        <div style="position: absolute; width: 34px; height: 34px; background: #10b981; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); box-shadow: 0 4px 15px rgba(16,185,129,0.4); border: 2px solid #FFFFFF;"></div>
+        <!-- Foto de Perfil embutida -->
+        <div style="position: relative; z-index: 2; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
+          ${innerHtml}
+        </div>
       </div>
-    </div>
-  `,
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-});
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+  });
+}
+
+// Função para criar o pino premium das matches (azul brilhante com foto de perfil)
+function createMatchUserIcon(avatarUrl: string | null, nome: string) {
+  const innerHtml = avatarUrl 
+    ? `<img src="${avatarUrl}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />`
+    : `<div style="width: 26px; height: 26px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
+
+  return L.divIcon({
+    className: "match-profile-pin",
+    html: `
+      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
+        <!-- Pointer drop azul royal -->
+        <div style="position: absolute; width: 34px; height: 34px; background: #00AEEF; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); box-shadow: 0 4px 15px rgba(0,174,239,0.3); border: 2px solid #FFFFFF;"></div>
+        <!-- Foto de Perfil embutida -->
+        <div style="position: relative; z-index: 2; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
+          ${innerHtml}
+        </div>
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+  });
+}
 
 // Componente auxiliar para animar e centrar o mapa suavemente quando a localização mudar
 function ChangeView({ center }: { center: [number, number] }) {
@@ -43,6 +78,23 @@ interface Props {
 
 export default function TradeMap({ matches }: Props) {
   const [center, setCenter] = useState<[number, number]>([38.7223, -9.1393]);
+  const [myProfile, setMyProfile] = useState<{ nome: string; avatar_url: string | null } | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function loadMyProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("nome, avatar_url")
+          .eq("id", user.id)
+          .single();
+        if (data) setMyProfile(data);
+      }
+    }
+    loadMyProfile();
+  }, [supabase]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -65,6 +117,18 @@ export default function TradeMap({ matches }: Props) {
         {/* User's approximate area */}
         <Circle center={center} radius={800} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.1, weight: 1, dashArray: "5, 10" }} />
 
+        {/* Marcador do Utilizador Atual (Foto de Perfil com Pulsação de Localização) */}
+        {myProfile && (
+          <Marker position={center} icon={createCurrentUserIcon(myProfile.avatar_url, myProfile.nome)}>
+            <Popup className="premium-popup">
+              <div style={{ padding: "16px", minWidth: 200, background: "var(--card-bg)", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-main)", textAlign: "center" }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "var(--success)" }}>Minha Localização</p>
+                <p style={{ margin: "4px 0 0 0", fontSize: 11, color: "var(--text-muted)" }}>Estás posicionado aqui no radar!</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {matches.map((match) => {
           // Simulate position for privacy
           const angle = (match.user_id.length % 360) * (Math.PI / 180);
@@ -73,7 +137,7 @@ export default function TradeMap({ matches }: Props) {
           const pos: [number, number] = [center[0] + latOffset, center[1] + lngOffset];
 
           return (
-            <Marker key={match.user_id} position={pos} icon={customIcon}>
+            <Marker key={match.user_id} position={pos} icon={createMatchUserIcon(match.avatar_url, match.nome)}>
               <Popup className="premium-popup">
                 <div style={{ padding: "16px", minWidth: 260, background: "var(--card-bg)", borderRadius: 24, border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-main)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
@@ -85,11 +149,11 @@ export default function TradeMap({ matches }: Props) {
                        </div>
                     )}
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>{match.nome}</p>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                        <MapPin size={10} style={{ color: "var(--text-muted)" }} />
-                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDistance(match.distancia_km)}</span>
-                      </div>
+                       <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>{match.nome}</p>
+                       <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                         <MapPin size={10} style={{ color: "var(--text-muted)" }} />
+                         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDistance(match.distancia_km)}</span>
+                       </div>
                     </div>
                   </div>
                   
@@ -134,6 +198,14 @@ export default function TradeMap({ matches }: Props) {
         }
         .leaflet-container {
           font-family: inherit !important;
+        }
+        .pulse-glow {
+          animation: pulse-ring 2s infinite ease-in-out;
+        }
+        @keyframes pulse-ring {
+          0% { transform: scale(0.95); opacity: 0.5; }
+          50% { transform: scale(1.25); opacity: 0.15; }
+          100% { transform: scale(1.4); opacity: 0; }
         }
       `}</style>
     </div>
