@@ -16,7 +16,7 @@ interface Props {
   readOnly?: boolean;
 }
 
-export default function StickerCard({ sticker, quantity, onUpdate, isEditMode }: Props) {
+export default function StickerCard({ sticker, quantity, onUpdate, isEditMode, readOnly }: Props) {
   const [showActions, setShowActions] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const supabase = createClient();
@@ -55,7 +55,7 @@ export default function StickerCard({ sticker, quantity, onUpdate, isEditMode }:
   async function updateQty(diff: number) {
     const newQty = Math.max(0, quantity + diff);
     if (newQty === quantity) return;
-    onUpdate(sticker.id, newQty);
+    onUpdate?.(sticker.id, newQty);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;

@@ -37,7 +37,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     });
 
     channel
-      .on("broadcast", { event: "new_message" }, (payload) => {
+      .on("broadcast", { event: "new_message" }, (payload: any) => {
         const newMsg = payload.payload as Message;
         if (newMsg.sender_id !== myUserId) {
           setMessages((prev) => {
@@ -46,7 +46,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           });
         }
       })
-      .on("broadcast", { event: "messages_read" }, (payload) => {
+      .on("broadcast", { event: "messages_read" }, (payload: any) => {
         const { conversationId: cid, readerId } = payload.payload;
         if (cid === conversationId && readerId !== myUserId) {
           setMessages(prev => prev.map(m => 
@@ -59,7 +59,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         const typingUsers = Object.values(state).flat().filter((u: any) => u.typing && u.user_id !== myUserId);
         setIsTyping(typingUsers.length > 0);
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
           channelRef.current = channel;
           await channel.track({ user_id: myUserId, typing: false });

@@ -25,13 +25,13 @@ export default function FollowListModal({ userId, type, onClose }: Props) {
           .from("follows")
           .select("follower:profiles!follows_follower_id_fkey(id, nome, username, avatar_url)")
           .eq("following_id", userId);
-        setUsers(data?.map(d => d.follower) || []);
+        setUsers(data?.map((d: any) => d.follower) || []);
       } else {
         const { data } = await supabase
           .from("follows")
           .select("following:profiles!follows_following_id_fkey(id, nome, username, avatar_url)")
           .eq("follower_id", userId);
-        setUsers(data?.map(d => d.following) || []);
+        setUsers(data?.map((d: any) => d.following) || []);
       }
       setLoading(false);
     }

@@ -43,7 +43,7 @@ const getFlagByCountry = (name: string) => {
   return `https://flagcdn.com/w160/${code}.png`;
 };
 
-export default function AlbumGrid({ stickers, userStickers }: Props) {
+export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
   const [search, setSearch] = useState("");
   const [stickerMap, setStickerMap] = useState(userStickers);
   const [isEditMode, setIsEditMode] = useState(false);
