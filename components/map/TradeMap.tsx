@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { MatchResult } from "@/types";
@@ -25,8 +25,16 @@ const customIcon = L.divIcon({
   iconAnchor: [16, 32],
 });
 
-interface Props {
-  matches: MatchResult[];
+// Componente auxiliar para animar e centrar o mapa suavemente quando a localização mudar
+function ChangeView({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo(center, 13, {
+      animate: true,
+      duration: 1.5
+    });
+  }, [center, map]);
+  return null;
 }
 
 export default function TradeMap({ matches }: Props) {
@@ -44,6 +52,7 @@ export default function TradeMap({ matches }: Props) {
   return (
     <div style={{ width: "100%", height: "100%", borderRadius: 32, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 25px 80px -20px rgba(0,0,0,0.5)" }}>
       <MapContainer center={center} zoom={13} style={{ width: "100%", height: "100%", background: "var(--bg-main)" }}>
+        <ChangeView center={center} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
@@ -95,9 +104,9 @@ export default function TradeMap({ matches }: Props) {
                     <Link href={`/profile/${match.user_id}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--border-light)", color: "var(--text-main)", borderRadius: 12, padding: "10px", fontSize: 13, fontWeight: 600, textDecoration: "none", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <User size={14} /> Perfil
                     </Link>
-                    <button style={{ flex: 1.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--primary)", color: "var(--text-main)", borderRadius: 12, padding: "10px", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,174,239,0.2)" }}>
+                    <Link href={`/api/chat/start?userId=${match.user_id}`} style={{ flex: 1.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--primary)", color: "var(--text-main)", borderRadius: 12, padding: "10px", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", textDecoration: "none", boxShadow: "0 4px 12px rgba(0,174,239,0.2)" }}>
                       <MessageCircle size={14} /> Chat
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </Popup>
