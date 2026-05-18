@@ -283,14 +283,6 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       });
 
     return () => {
-      // Notificar cancelamento ao sair do chat
-      if (channelRef.current) {
-        channelRef.current.send({
-          type: "broadcast",
-          event: "trade_sync",
-          payload: { userId: myUserId, isActive: false }
-        });
-      }
       supabase.removeChannel(channel);
       channelRef.current = null;
       if (receiverTypingTimeout.current) clearTimeout(receiverTypingTimeout.current);
