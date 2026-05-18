@@ -22,6 +22,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const amITyping = useRef(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -41,12 +43,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload: any) => {
           const newMsg = payload.new as Message;
-          if (newMsg.sender_id !== myUserId) {
-            setMessages((prev) => {
-              if (prev.find((m) => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
-          }
+          setMessages((prev) => {
+            if (prev.find((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
         }
       )
       .on(
@@ -93,8 +93,25 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
   async function handleTyping(val: string) {
     setInput(val);
-    if (channelRef.current) {
-      await channelRef.current.track({ user_id: myUserId, typing: val.length > 0 });
+    if (!channelRef.current) return;
+
+    if (!amITyping.current && val.length > 0) {
+      amITyping.current = true;
+      channelRef.current.track({ user_id: myUserId, typing: true }).catch(console.error);
+    } else if (val.length === 0 && amITyping.current) {
+      amITyping.current = false;
+      channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    if (val.length > 0) {
+      typingTimeoutRef.current = setTimeout(() => {
+        amITyping.current = false;
+        if (channelRef.current) {
+          channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
+        }
+      }, 2000);
     }
   }
 
@@ -105,38 +122,24 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     const content = input.trim();
     setInput("");
     
-    // Create optimistic message for instant UI feedback
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMsg: Message = {
-      id: tempId as any,
+    // Removido o update otimista. A interface irá atualizar automaticamente 
+    // assim que o evento do postgres_changes chegar (milissegundos), garantindo 100% consistência.
+
+    // Save to database sem select() para evitar falsos erros de RLS
+    const { error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender_id: myUserId,
       content,
-      read: false,
-      created_at: new Date().toISOString(),
-    };
-    
-    setMessages((prev) => [...prev, optimisticMsg]);
+    });
 
-    // Save to database
-    const { data: savedMsg, error } = await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: myUserId,
-      content,
-    }).select().single();
-
-    if (error || !savedMsg) {
-      console.error("Failed to save message error details:", JSON.stringify(error, null, 2));
-      console.error("Full error object:", error);
-      // Remove optimistic message if failed
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    if (error) {
+      console.error("Failed to save message:", error);
       return;
     }
 
-    // Replace optimistic message with real message
-    setMessages((prev) => prev.map((m) => m.id === tempId ? savedMsg : m));
-
-    // Reset typing status
+    // Reset typing status and timeout
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    amITyping.current = false;
     if (channelRef.current) {
       channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
     }
