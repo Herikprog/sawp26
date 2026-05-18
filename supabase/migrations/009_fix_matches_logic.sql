@@ -56,7 +56,7 @@ BEGIN
     p.avatar_url,
     p.bairro,
     p.cidade,
-    ROUND(ST_Distance(p.location, v_location) / 1000.0, 1)::FLOAT,
+    ROUND((ST_Distance(p.location, v_location) / 1000.0)::numeric, 1)::FLOAT,
     ARRAY(
       SELECT us.sticker_id FROM user_stickers us
       WHERE us.user_id = p.id AND us.quantity >= 1
@@ -74,9 +74,9 @@ BEGIN
         WHERE us.user_id = p.id AND us.quantity >= 1
           AND us.sticker_id NOT IN (SELECT sticker_id FROM minhas_obtidas)
       ), 1), 0) * 10.0
-      + p.reputacao * 5.0
+      + COALESCE(p.reputacao, 5.0) * 5.0
       + CASE WHEN p.plano = 'premium' THEN 20.0 ELSE 0.0 END
-      - ROUND(ST_Distance(p.location, v_location) / 1000.0, 1)
+      - ROUND((ST_Distance(p.location, v_location) / 1000.0)::numeric, 1)
     )::FLOAT,
     (p.plano = 'premium')
   FROM profiles p
