@@ -25,17 +25,33 @@ export default function MapPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    async function loadMatches() {
+    async function loadMatches(lat?: number, lon?: number) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data } = await supabase.rpc("get_nearby_matches", {
         p_user_id: user.id,
         p_radius_km: 50,
+        p_lat: lat,
+        p_lon: lon,
       });
       if (data) setMatches(data);
     }
-    loadMatches();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          loadMatches(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          console.warn("GPS bloqueado no Mapa, usando fallback do perfil cadastrado.");
+          loadMatches();
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      loadMatches();
+    }
   }, [supabase]);
 
   return (
