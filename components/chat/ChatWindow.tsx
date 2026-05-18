@@ -6,7 +6,7 @@ import type { Message, Profile } from "@/types";
 import { timeAgo } from "@/lib/utils";
 import { 
   Send, ChevronLeft, Info, MoreHorizontal, Shuffle, 
-  User, BookOpen, Check, X, Plus, Trash2, Loader2, AlertCircle
+  User, BookOpen, Check, X, Plus, Trash2, Loader2, AlertCircle, PhoneCall
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -426,6 +426,67 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     });
   }
 
+  async function proposeTradeCall() {
+    if (tradeSession.myOffers.length === 0 && tradeSession.otherOffers.length === 0) {
+      toast.error("Adicione pelo menos uma figurinha para propor a troca!");
+      return;
+    }
+    
+    setTradeSession(prev => ({ ...prev, isExecuting: true }));
+    
+    try {
+      const offeredCodes = tradeSession.myOffers.map(o => o.codigo);
+      const wantedCodes = tradeSession.otherOffers.map(o => o.codigo);
+      const allCodes = [...offeredCodes, ...wantedCodes];
+      
+      let stickersData: any[] = [];
+      if (allCodes.length > 0) {
+        const { data } = await supabase
+          .from("stickers")
+          .select("id, codigo")
+          .in("codigo", allCodes);
+        if (data) stickersData = data;
+      }
+      
+      const codeToId: Record<string, number> = {};
+      stickersData.forEach(s => {
+        codeToId[s.codigo] = s.id;
+      });
+      
+      const offeredIds = offeredCodes.map(c => codeToId[c]).filter(Boolean);
+      const wantedIds = wantedCodes.map(c => codeToId[c]).filter(Boolean);
+      
+      const { data: newTrade, error } = await supabase
+        .from("trades")
+        .insert({
+          initiator_id: myUserId,
+          receiver_id: otherUser.id,
+          offered_stickers: offeredIds,
+          wanted_stickers: wantedIds,
+          status: "pending"
+        })
+        .select("*")
+        .single();
+        
+      if (error) throw error;
+      
+      toast.success("📞 Chamada de troca enviada!");
+      
+      // Fechar modal local do chat de figurinhas
+      setTradeSession(prev => ({ ...prev, isActive: false, isExecuting: false }));
+      
+      // Disparar o modal global de chamada ativa
+      window.dispatchEvent(new CustomEvent("trigger_outgoing_trade", { 
+        detail: { trade: newTrade } 
+      }));
+      
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Erro ao propor troca: ${err.message || "Erro desconhecido"}`);
+      setTradeSession(prev => ({ ...prev, isExecuting: false }));
+    }
+  }
+
   async function toggleAccept() {
     const nextAccept = !tradeSession.myAccepted;
     
@@ -814,32 +875,27 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                   Recusar / Sair
                 </button>
                 <button
-                  onClick={toggleAccept}
+                  onClick={proposeTradeCall}
                   disabled={tradeSession.isExecuting}
                   style={{
                     background: tradeSession.isExecuting 
                       ? "rgba(255,255,255,0.1)" 
-                      : (tradeSession.myAccepted ? "var(--success-light, #2ecc71)" : "var(--gradient-primary)"),
-                    color: tradeSession.myAccepted ? "#2ecc71" : "#fff",
+                      : "var(--gradient-primary)",
+                    color: "#fff",
                     border: "none", padding: "12px 32px", borderRadius: 14,
                     fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-                    boxShadow: "0 8px 24px -4px rgba(0,174,239,0.2)", transition: "all 0.3s ease"
+                    boxShadow: "0 8px 24px -4px rgba(0,174,239,0.3)", transition: "all 0.3s ease"
                   }}
                 >
                   {tradeSession.isExecuting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Efetuando Troca...
-                    </>
-                  ) : tradeSession.myAccepted ? (
-                    <>
-                      <Check size={16} />
-                      Aguardando {otherUser.nome.split(" ")[0]}...
+                      A Enviar Chamada...
                     </>
                   ) : (
                     <>
-                      <Check size={16} />
-                      Aceitar Troca
+                      <PhoneCall size={16} />
+                      Iniciar Chamada de Troca
                     </>
                   )}
                 </button>

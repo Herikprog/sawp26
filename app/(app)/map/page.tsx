@@ -22,37 +22,91 @@ const TradeMap = dynamic(() => import("@/components/map/TradeMap"), {
 
 export default function MapPage() {
   const [matches, setMatches] = useState<MatchResult[]>([]);
+  const [radius, setRadius] = useState<number>(20);
+  const [stickersCatalog, setStickersCatalog] = useState<Record<number, string>>({});
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const supabase = createClient();
 
+  // Carregar catálogo de figurinhas para resolver os códigos no popup
   useEffect(() => {
-    async function loadMatches(lat?: number, lon?: number) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase.rpc("get_nearby_matches", {
-        p_user_id: user.id,
-        p_radius_km: 50,
-        p_lat: lat,
-        p_lon: lon,
-      });
-      if (data) setMatches(data);
+    async function loadCatalog() {
+      const { data } = await supabase.from("stickers").select("id, codigo");
+      if (data) {
+        const catalog: Record<number, string> = {};
+        data.forEach((s: { id: number; codigo: string }) => {
+          catalog[s.id] = s.codigo;
+        });
+        setStickersCatalog(catalog);
+      }
     }
+    loadCatalog();
+  }, [supabase]);
 
+  // Capturar coordenadas GPS do utilizador
+  useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          loadMatches(pos.coords.latitude, pos.coords.longitude);
+          setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         },
         () => {
           console.warn("GPS bloqueado no Mapa, usando fallback do perfil cadastrado.");
-          loadMatches();
+          fetchNearbyMatches();
         },
         { enableHighAccuracy: true, timeout: 8000 }
       );
     } else {
-      loadMatches();
+      fetchNearbyMatches();
     }
-  }, [supabase]);
+  }, []);
+
+  // Recarregar colecionadores próximos quando as coordenadas ou o raio mudarem
+  useEffect(() => {
+    fetchNearbyMatches();
+  }, [coords, radius]);
+
+  async function fetchNearbyMatches() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const rpcParams: any = {
+      p_user_id: user.id,
+      p_radius_km: radius,
+    };
+
+    if (coords) {
+      rpcParams.p_lat = coords.lat;
+      rpcParams.p_lon = coords.lon;
+    }
+
+    const { data } = await supabase.rpc("get_nearby_matches", rpcParams);
+    if (data && data.length > 0) {
+      const userIds = data.map((m: any) => m.user_id);
+      const { data: locationsData } = await supabase
+        .from("profiles")
+        .select("id, location")
+        .in("id", userIds);
+
+      if (locationsData) {
+        const locationMap: Record<string, string> = {};
+        locationsData.forEach((p: any) => {
+          if (p.location) {
+            locationMap[p.id] = p.location;
+          }
+        });
+
+        const enhancedMatches = data.map((m: any) => ({
+          ...m,
+          location: locationMap[m.user_id] || null
+        }));
+        setMatches(enhancedMatches);
+      } else {
+        setMatches(data);
+      }
+    } else {
+      setMatches(data || []);
+    }
+  }
 
   return (
     <div style={{ padding: "48px 24px", height: "calc(100vh - 64px)", display: "flex", flexDirection: "column", maxWidth: 1200, margin: "0 auto", width: "100%" }}>
@@ -73,18 +127,45 @@ export default function MapPage() {
       </div>
 
       {/* Map Container */}
-      <div style={{ flex: 1, minHeight: 400, position: "relative" }}>
-        <TradeMap matches={matches} />
+      <div style={{ flex: 1, minHeight: 400, position: "relative", borderRadius: 32, overflow: "hidden" }}>
+        <TradeMap matches={matches} radius={radius} stickersCatalog={stickersCatalog} />
         
-        {/* Floating Info */}
+        {/* Painel Flutuante Interativo de Varredura */}
         <div style={{
-          position: "absolute", bottom: 24, left: 24, zIndex: 40,
-          background: "var(--bg-main-transparent)", backdropFilter: "blur(12px)",
-          padding: "12px 20px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
-          display: "flex", alignItems: "center", gap: 12
+          position: "absolute", top: 24, right: 24, zIndex: 400,
+          background: "rgba(10, 22, 40, 0.8)", backdropFilter: "blur(16px)",
+          padding: "20px 24px", borderRadius: 24, border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", gap: 14,
+          minWidth: 260
         }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 10px #00C96D" }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-main)" }}>{matches.length} Colecionadores Próximos</span>
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--primary)" }}>Varredura de Radar</span>
+            <h3 style={{ margin: "2px 0 0 0", fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>Raio de Busca</h3>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: "var(--text-sec)", fontWeight: 500 }}>Distância Máxima:</span>
+              <span style={{ fontSize: 15, color: "var(--primary)", fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif" }}>{radius} km</span>
+            </div>
+            <input 
+              type="range" 
+              min="5" 
+              max="100" 
+              step="5"
+              value={radius} 
+              onChange={(e) => setRadius(parseInt(e.target.value))} 
+              style={{
+                width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.15)",
+                outline: "none", cursor: "pointer", accentColor: "var(--primary)", transition: "all 0.2s"
+              }}
+            />
+          </div>
+
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 10px #00C96D" }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>{matches.length} Colecionadores Próximos</span>
+          </div>
         </div>
       </div>
     </div>

@@ -41,6 +41,7 @@ const NAV = [
 ];
 
 import { useUnreadCounts } from "@/hooks/useUnreadCounts";
+import GlobalNotificationBell from "@/components/layout/GlobalNotificationBell";
 
 export default function Sidebar({ profile, email }: { profile: Profile | null, email?: string }) {
   const pathname = usePathname();
@@ -313,16 +314,19 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
             Swap<span style={{ color: "var(--primary)" }}>26</span>
           </span>
         </div>
-        <button
-          onClick={() => setMobileMenuOpen(true)}
-          style={{
-            background: "transparent", border: "none", color: "var(--text-main)",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 8,
-          }}
-        >
-          <Menu size={24} />
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <GlobalNotificationBell isMobile={true} />
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            style={{
+              background: "transparent", border: "none", color: "var(--text-main)",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 8,
+            }}
+          >
+            <Menu size={24} />
+          </button>
+        </div>
       </div>
 
       {/* MOBILE DRAWER */}

@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/layout/Sidebar";
 import MobileNav from "@/components/layout/MobileNav";
 import RealtimeManager from "@/components/RealtimeManager";
+import GlobalTradeManager from "@/components/trade/GlobalTradeManager";
+import GlobalNotificationBell from "@/components/layout/GlobalNotificationBell";
 
 export default async function AppLayout({
   children,
@@ -29,6 +31,11 @@ export default async function AppLayout({
       fontFamily: "'Inter', sans-serif"
     }}>
       <RealtimeManager />
+      <GlobalTradeManager />
+      {/* Global Notifications Bell (Desktop) */}
+      <div className="hidden md:block">
+        <GlobalNotificationBell />
+      </div>
       {/* Sidebar — desktop only */}
       <Sidebar profile={profile} email={user.email} />
 
