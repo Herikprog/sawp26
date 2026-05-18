@@ -24,6 +24,7 @@ RETURNS TABLE (
   is_premium       BOOLEAN
 )
 LANGUAGE plpgsql SECURITY DEFINER AS $$
+#variable_conflict use_column
 DECLARE
   v_location GEOGRAPHY;
   v_plano    TEXT;
