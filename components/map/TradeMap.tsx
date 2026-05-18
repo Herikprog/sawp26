@@ -37,6 +37,10 @@ function ChangeView({ center }: { center: [number, number] }) {
   return null;
 }
 
+interface Props {
+  matches: MatchResult[];
+}
+
 export default function TradeMap({ matches }: Props) {
   const [center, setCenter] = useState<[number, number]>([38.7223, -9.1393]);
 
