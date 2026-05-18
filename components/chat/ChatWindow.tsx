@@ -26,7 +26,9 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const channelRef = useRef<any>(null);
   const amITyping = useRef(false);
   const isScrolledToBottom = useRef(true);
+  const typingBroadcastInterval = useRef<NodeJS.Timeout | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const receiverTypingTimeout = useRef<NodeJS.Timeout | null>(null);
   const supabase = createClient();
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -43,7 +45,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   useEffect(() => {
     const channel = supabase.channel(`room:${conversationId}`, {
       config: {
-        presence: { key: myUserId },
+        broadcast: { ack: false, self: false },
       },
     });
 
@@ -67,23 +69,29 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           setMessages((prev) => prev.map((m) => m.id === updatedMsg.id ? updatedMsg : m));
         }
       )
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        console.log("Presence sync state:", state, "myUserId:", myUserId);
-        
-        // Filtra rigidamente pela chave do outro usuário e garante o valor booleano true
-        const typingUsers = Object.entries(state)
-          .filter(([key]) => key !== myUserId)
-          .flatMap(([_, presences]) => presences)
-          .filter((presence: any) => presence.typing === true);
-
-        setIsTyping(typingUsers.length > 0);
+      .on("broadcast", { event: "typing" }, (payload: any) => {
+        const { userId, typing } = payload.payload;
+        if (userId !== myUserId) {
+          if (typing) {
+            setIsTyping(true);
+            if (receiverTypingTimeout.current) clearTimeout(receiverTypingTimeout.current);
+            // Fail-safe: se o remetente sumir, apaga o balão em 3.5 segundos
+            receiverTypingTimeout.current = setTimeout(() => {
+              setIsTyping(false);
+            }, 3500);
+          } else {
+            setIsTyping(false);
+            if (receiverTypingTimeout.current) {
+              clearTimeout(receiverTypingTimeout.current);
+              receiverTypingTimeout.current = null;
+            }
+          }
+        }
       })
       .subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
           setConnStatus("connected");
           channelRef.current = channel;
-          await channel.track({ user_id: myUserId, typing: false });
         } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
           setConnStatus("offline");
         }
@@ -92,6 +100,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     return () => {
       supabase.removeChannel(channel);
       channelRef.current = null;
+      if (receiverTypingTimeout.current) clearTimeout(receiverTypingTimeout.current);
     };
   }, [conversationId, myUserId, supabase]);
 
@@ -117,21 +126,52 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
     if (!amITyping.current && val.length > 0) {
       amITyping.current = true;
-      channelRef.current.track({ user_id: myUserId, typing: true }).catch(console.error);
-    } else if (val.length === 0 && amITyping.current) {
-      amITyping.current = false;
-      channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
+      // Envia broadcast imediato de início de digitação
+      channelRef.current.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { userId: myUserId, typing: true }
+      });
+
+      // Keep-alive a cada 1.5s para conexões lentas
+      typingBroadcastInterval.current = setInterval(() => {
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: "broadcast",
+            event: "typing",
+            payload: { userId: myUserId, typing: true }
+          });
+        }
+      }, 1500);
     }
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     
     if (val.length > 0) {
       typingTimeoutRef.current = setTimeout(() => {
-        amITyping.current = false;
-        if (channelRef.current) {
-          channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
-        }
-      }, 2000);
+        stopTyping();
+      }, 2500);
+    } else {
+      stopTyping();
+    }
+  }
+
+  function stopTyping() {
+    amITyping.current = false;
+    if (typingBroadcastInterval.current) {
+      clearInterval(typingBroadcastInterval.current);
+      typingBroadcastInterval.current = null;
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { userId: myUserId, typing: false }
+      });
     }
   }
 
@@ -170,11 +210,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     }
 
     // Reset typing status and timeout
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    amITyping.current = false;
-    if (channelRef.current) {
-      channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
-    }
+    stopTyping();
   }
 
   return (
