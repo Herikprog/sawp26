@@ -6,6 +6,7 @@ import type { MatchResult } from "@/types";
 import { formatDistance } from "@/lib/utils";
 import { MessageCircle, Shuffle, Star, MapPin, ChevronRight, Zap, TrendingUp, User, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 
@@ -200,13 +201,14 @@ export default function MatchCard({ match, myUserId, index }: Props) {
 
           {/* Secondary Actions: Profile & Album */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <button
-              onClick={() => router.push(`/profile/${match.user_id}`)}
+            <Link
+              href={`/profile/${match.user_id}`}
               style={{
                 padding: "12px", borderRadius: 12,
                 background: "var(--input-bg)", color: "var(--text-main)", fontWeight: 600,
                 fontSize: 13, display: "flex", alignItems: "center",
                 justifyContent: "center", gap: 6, border: "1px solid var(--border-color)", cursor: "pointer",
+                textDecoration: "none",
                 transition: "all 0.2s ease-in-out",
               }}
               onMouseEnter={(e) => {
@@ -220,14 +222,15 @@ export default function MatchCard({ match, myUserId, index }: Props) {
             >
               <User size={14} style={{ color: "var(--primary)" }} />
               Ver Perfil
-            </button>
-            <button
-              onClick={() => router.push(`/profile/${match.user_id}#album`)}
+            </Link>
+            <Link
+              href={`/profile/${match.user_id}#album`}
               style={{
                 padding: "12px", borderRadius: 12,
                 background: "var(--input-bg)", color: "var(--text-main)", fontWeight: 600,
                 fontSize: 13, display: "flex", alignItems: "center",
                 justifyContent: "center", gap: 6, border: "1px solid var(--border-color)", cursor: "pointer",
+                textDecoration: "none",
                 transition: "all 0.2s ease-in-out",
               }}
               onMouseEnter={(e) => {
@@ -241,7 +244,7 @@ export default function MatchCard({ match, myUserId, index }: Props) {
             >
               <BookOpen size={14} style={{ color: "var(--success)" }} />
               Ver Álbum
-            </button>
+            </Link>
           </div>
         </div>
       </div>

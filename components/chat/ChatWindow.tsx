@@ -4,10 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Message, Profile } from "@/types";
 import { timeAgo } from "@/lib/utils";
-import { Send, ChevronLeft, Info, MoreHorizontal } from "lucide-react";
+import { 
+  Send, ChevronLeft, Info, MoreHorizontal, Shuffle, 
+  User, BookOpen, Check, X, Plus, Trash2, Loader2, AlertCircle
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 
 interface Props {
   conversationId: string;
@@ -16,11 +20,41 @@ interface Props {
   otherUser: Profile;
 }
 
+interface TradeOffer {
+  codigo: string;
+  quantity: number;
+}
+
+interface TradeSession {
+  isActive: boolean;
+  myOffers: TradeOffer[];
+  otherOffers: TradeOffer[];
+  myAccepted: boolean;
+  otherAccepted: boolean;
+  errorMessage: string;
+  isExecuting: boolean;
+}
+
 export default function ChatWindow({ conversationId, initialMessages, myUserId, otherUser }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [connStatus, setConnStatus] = useState<"connecting" | "connected" | "offline">("connecting");
+  
+  // Estados para o Sistema de Troca
+  const [tradeSession, setTradeSession] = useState<TradeSession>({
+    isActive: false,
+    myOffers: [],
+    otherOffers: [],
+    myAccepted: false,
+    otherAccepted: false,
+    errorMessage: "",
+    isExecuting: false
+  });
+  
+  const [myInventory, setMyInventory] = useState<Record<string, number>>({});
+  const [myDuplicates, setMyDuplicates] = useState<{ codigo: string; quantity: number }[]>([]);
+  const [manualCode, setManualCode] = useState("");
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -39,15 +73,43 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
   useEffect(() => {
     if (isFirstRender.current) {
-      // Abre a tela já posicionada no final de forma instantânea
       bottomRef.current?.scrollIntoView({ behavior: "auto" });
       isFirstRender.current = false;
     } else if (isScrolledToBottom.current) {
-      // Rola suavemente apenas para novas mensagens/digitação
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isTyping]);
 
+  // Carregar inventário e duplicadas locais para validação de trocas
+  async function loadInventory() {
+    const { data: userStickers } = await supabase
+      .from("user_stickers")
+      .select("quantity, sticker:stickers(codigo)")
+      .eq("user_id", myUserId)
+      .gt("quantity", 0);
+
+    if (userStickers) {
+      const inv: Record<string, number> = {};
+      const dups: { codigo: string; quantity: number }[] = [];
+      
+      userStickers.forEach((item: any) => {
+        const code = item.sticker.codigo;
+        inv[code] = item.quantity;
+        if (item.quantity > 1) {
+          dups.push({ codigo: code, quantity: item.quantity });
+        }
+      });
+      
+      setMyInventory(inv);
+      setMyDuplicates(dups);
+    }
+  }
+
+  useEffect(() => {
+    loadInventory();
+  }, [tradeSession.isActive]);
+
+  // WebSocket / Supabase Realtime Channels
   useEffect(() => {
     const channel = supabase.channel(`room:${conversationId}`, {
       config: {
@@ -81,7 +143,6 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           if (typing) {
             setIsTyping(true);
             if (receiverTypingTimeout.current) clearTimeout(receiverTypingTimeout.current);
-            // Fail-safe: se o remetente sumir, apaga o balão em 3.5 segundos
             receiverTypingTimeout.current = setTimeout(() => {
               setIsTyping(false);
             }, 3500);
@@ -94,6 +155,32 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           }
         }
       })
+      .on("broadcast", { event: "trade_sync" }, (payload: any) => {
+        const { userId, offers, accepted, isActive } = payload.payload;
+        if (userId !== myUserId) {
+          setTradeSession((prev) => {
+            const nextSession = {
+              ...prev,
+              isActive: prev.isActive || isActive,
+              otherOffers: offers ?? prev.otherOffers,
+              otherAccepted: accepted ?? prev.otherAccepted,
+            };
+
+            // Se o outro utilizador fechar a modal de trocas
+            if (isActive === false && prev.isActive) {
+              toast.error("O outro colecionador cancelou a negociação de trocas.");
+              nextSession.isActive = false;
+              nextSession.myOffers = [];
+              nextSession.otherOffers = [];
+              nextSession.myAccepted = false;
+              nextSession.otherAccepted = false;
+              nextSession.errorMessage = "";
+            }
+
+            return nextSession;
+          });
+        }
+      })
       .subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
           setConnStatus("connected");
@@ -104,13 +191,21 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       });
 
     return () => {
+      // Notificar cancelamento ao sair do chat
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "trade_sync",
+          payload: { userId: myUserId, isActive: false }
+        });
+      }
       supabase.removeChannel(channel);
       channelRef.current = null;
       if (receiverTypingTimeout.current) clearTimeout(receiverTypingTimeout.current);
     };
   }, [conversationId, myUserId, supabase]);
 
-  // Mark as read when messages arrive or window opens
+  // Marcar como lido
   useEffect(() => {
     async function markAsRead() {
       const hasUnread = messages.some(m => !m.read && m.sender_id !== myUserId);
@@ -126,20 +221,19 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     markAsRead();
   }, [messages, conversationId, myUserId, supabase]);
 
+  // Digitação
   async function handleTyping(val: string) {
     setInput(val);
     if (!channelRef.current) return;
 
     if (!amITyping.current && val.length > 0) {
       amITyping.current = true;
-      // Envia broadcast imediato de início de digitação
       channelRef.current.send({
         type: "broadcast",
         event: "typing",
         payload: { userId: myUserId, typing: true }
       });
 
-      // Keep-alive a cada 1.5s para conexões lentas
       typingBroadcastInterval.current = setInterval(() => {
         if (channelRef.current) {
           channelRef.current.send({
@@ -181,6 +275,221 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     }
   }
 
+  // --- MÉTODOS DE CONTROLE DA TROCA ---
+
+  function startTrade() {
+    setTradeSession({
+      isActive: true,
+      myOffers: [],
+      otherOffers: [],
+      myAccepted: false,
+      otherAccepted: false,
+      errorMessage: "",
+      isExecuting: false
+    });
+    
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "trade_sync",
+        payload: {
+          userId: myUserId,
+          offers: [],
+          accepted: false,
+          isActive: true
+        }
+      });
+    }
+    toast.success("Painel de Troca em tempo real aberto!");
+  }
+
+  function cancelTrade() {
+    setTradeSession({
+      isActive: false,
+      myOffers: [],
+      otherOffers: [],
+      myAccepted: false,
+      otherAccepted: false,
+      errorMessage: "",
+      isExecuting: false
+    });
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "trade_sync",
+        payload: {
+          userId: myUserId,
+          isActive: false
+        }
+      });
+    }
+    toast.error("Troca cancelada.");
+  }
+
+  function broadcastOffers(myOffers: TradeOffer[], acceptedStatus: boolean) {
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "trade_sync",
+        payload: {
+          userId: myUserId,
+          offers: myOffers,
+          accepted: acceptedStatus,
+          isActive: true
+        }
+      });
+    }
+  }
+
+  function addStickerToOffer(codigo: string) {
+    const cleanCode = codigo.toUpperCase().trim();
+    if (!cleanCode) return;
+
+    // Verificar se o usuário possui a figurinha
+    const ownedQty = myInventory[cleanCode] || 0;
+    if (ownedQty === 0) {
+      toast.error(`Você não possui a figurinha ${cleanCode} no seu álbum.`);
+      return;
+    }
+
+    // REGRA DE QUANTIDADE FRONTEIRA: Manter pelo menos 1 unidade residual
+    if (ownedQty <= 1) {
+      toast.error(`Você possui apenas 1 unidade de ${cleanCode}. A regra de trocas exige manter pelo menos 1 figurinha residual no álbum.`);
+      return;
+    }
+
+    // Verificar se já está na lista de ofertas
+    const alreadyOffered = tradeSession.myOffers.find(o => o.codigo === cleanCode);
+    const offeredQty = alreadyOffered ? alreadyOffered.quantity : 0;
+
+    // Validar se pode adicionar mais 1
+    if (offeredQty + 1 >= ownedQty) {
+      toast.error(`Bloqueio de Quantidade: Você possui ${ownedQty} unidades de ${cleanCode} e precisa manter pelo menos 1 no álbum.`);
+      return;
+    }
+
+    let updatedOffers: TradeOffer[];
+    if (alreadyOffered) {
+      updatedOffers = tradeSession.myOffers.map(o => 
+        o.codigo === cleanCode ? { ...o, quantity: o.quantity + 1 } : o
+      );
+    } else {
+      updatedOffers = [...tradeSession.myOffers, { codigo: cleanCode, quantity: 1 }];
+    }
+
+    setTradeSession(prev => {
+      const next = { ...prev, myOffers: updatedOffers, myAccepted: false, errorMessage: "" };
+      broadcastOffers(updatedOffers, false);
+      return next;
+    });
+
+    setManualCode("");
+  }
+
+  function updateOfferQuantity(codigo: string, delta: number) {
+    const offer = tradeSession.myOffers.find(o => o.codigo === codigo);
+    if (!offer) return;
+
+    const newQty = offer.quantity + delta;
+    if (newQty <= 0) {
+      removeStickerFromOffer(codigo);
+      return;
+    }
+
+    const ownedQty = myInventory[codigo] || 0;
+    
+    // Validar limite de manter pelo menos 1 figurinha residual
+    if (newQty >= ownedQty) {
+      toast.error(`Bloqueio de Quantidade: Você possui ${ownedQty} unidades de ${codigo} e precisa manter pelo menos 1 no álbum.`);
+      return;
+    }
+
+    const updatedOffers = tradeSession.myOffers.map(o => 
+      o.codigo === codigo ? { ...o, quantity: newQty } : o
+    );
+
+    setTradeSession(prev => {
+      const next = { ...prev, myOffers: updatedOffers, myAccepted: false, errorMessage: "" };
+      broadcastOffers(updatedOffers, false);
+      return next;
+    });
+  }
+
+  function removeStickerFromOffer(codigo: string) {
+    const updatedOffers = tradeSession.myOffers.filter(o => o.codigo !== codigo);
+
+    setTradeSession(prev => {
+      const next = { ...prev, myOffers: updatedOffers, myAccepted: false, errorMessage: "" };
+      broadcastOffers(updatedOffers, false);
+      return next;
+    });
+  }
+
+  async function toggleAccept() {
+    const nextAccept = !tradeSession.myAccepted;
+    
+    setTradeSession(prev => {
+      const next = { ...prev, myAccepted: nextAccept, errorMessage: "" };
+      broadcastOffers(prev.myOffers, nextAccept);
+      return next;
+    });
+
+    // Se ambos aceitaram, podemos rodar o fechamento imediato da transação!
+    if (nextAccept && tradeSession.otherAccepted) {
+      await executeStickerExchange();
+    }
+  }
+
+  async function executeStickerExchange() {
+    setTradeSession(prev => ({ ...prev, isExecuting: true, errorMessage: "" }));
+    
+    // Chamar a procedure transacionada no banco de dados
+    const { data, error } = await supabase.rpc("execute_sticker_trade", {
+      p_conversation_id: conversationId,
+      p_user_a_id: myUserId,
+      p_user_b_id: otherUser.id,
+      p_user_a_offers: tradeSession.myOffers,
+      p_user_b_offers: tradeSession.otherOffers
+    });
+
+    if (error) {
+      console.error("Erro na transação de troca:", error);
+      
+      // Cancelar aceites e expor o erro em tela
+      setTradeSession(prev => {
+        const next = { 
+          ...prev, 
+          isExecuting: false, 
+          myAccepted: false, 
+          otherAccepted: false,
+          errorMessage: error.message || "Erro desconhecido ao processar a troca." 
+        };
+        broadcastOffers(prev.myOffers, false);
+        return next;
+      });
+      toast.error("Falha ao concluir troca. Verifique o alerta no painel.");
+    } else {
+      toast.success("🏆 Troca realizada e álbuns atualizados com sucesso!");
+      
+      // Fechar painel de troca e zerar os buffers
+      setTradeSession({
+        isActive: false,
+        myOffers: [],
+        otherOffers: [],
+        myAccepted: false,
+        otherAccepted: false,
+        errorMessage: "",
+        isExecuting: false
+      });
+
+      // Atualizar o inventário local em background
+      loadInventory();
+    }
+  }
+
+  // --- FIM DOS MÉTODOS DE TROCA ---
+
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim()) return;
@@ -188,7 +497,12 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     const content = input.trim();
     setInput("");
     
-    // Geração de ID nativo: A interface atualiza a 0ms de latência.
+    // Interceptar comando de troca
+    if (content.toLowerCase() === "/troca") {
+      startTrade();
+      return;
+    }
+
     const newId = crypto.randomUUID();
     const optimisticMsg: Message = {
       id: newId as any,
@@ -210,12 +524,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
     if (error) {
       console.error("Failed to save message:", error);
-      // Remove da tela caso o banco negue o salvamento (ex: falta de internet)
       setMessages((prev) => prev.filter((m) => m.id !== newId));
       return;
     }
 
-    // Reset typing status and timeout
     stopTyping();
   }
 
@@ -224,7 +536,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       display: "flex", flexDirection: "column", height: "100%", maxWidth: 800,
       margin: "0 auto", width: "100%", background: "var(--bg-main)", position: "relative"
     }}>
-      {/* Premium Header */}
+      {/* Header do Chat */}
       <div style={{
         padding: "16px 24px", background: "var(--bg-main-transparent)",
         backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
@@ -268,7 +580,23 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        
+        {/* Ações do Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Botão de Trocar Super Premium */}
+          <button 
+            onClick={startTrade}
+            style={{ 
+              background: "var(--gradient-primary)", border: "none", color: "#fff", 
+              padding: "8px 16px", borderRadius: 12, cursor: "pointer", 
+              fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
+              boxShadow: "0 4px 15px rgba(0,174,239,0.2)"
+            }}
+          >
+            <Shuffle size={14} />
+            Propor Troca
+          </button>
+          
           <button style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: 8, cursor: "pointer" }}>
             <Info size={20} />
           </button>
@@ -278,7 +606,250 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         </div>
       </div>
 
-      {/* Message Area */}
+      {/* ÁREA DA MODAL / OVERLAY DE NEGOCIAÇÃO EM TEMPO REAL */}
+      <AnimatePresence>
+        {tradeSession.isActive && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            style={{
+              position: "absolute", top: 77, left: 0, right: 0, bottom: 0,
+              background: "rgba(7, 17, 31, 0.95)", backdropFilter: "blur(20px)",
+              zIndex: 50, padding: 24, display: "flex", flexDirection: "column",
+              borderTop: "1px solid rgba(255, 255, 255, 0.05)"
+            }}
+          >
+            {/* Header da modal */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+                  <Shuffle size={18} style={{ color: "var(--primary)" }} /> Negociação de Figurinhass em Tempo Real
+                </h3>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0 0" }}>
+                  Adicione as figurinhas que deseja oferecer e veja o que {otherUser.nome.split(" ")[0]} está oferecendo.
+                </p>
+              </div>
+              <button 
+                onClick={cancelTrade}
+                style={{ background: "rgba(255,255,255,0.05)", border: "none", color: "var(--text-sec)", width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Alertas de Erro do Banco de Dados */}
+            {tradeSession.errorMessage && (
+              <div style={{
+                background: "rgba(255,77,106,0.1)", border: "1px solid rgba(255,77,106,0.2)",
+                padding: "12px 16px", borderRadius: 12, display: "flex", gap: 10, alignItems: "center",
+                color: "var(--danger)", fontSize: 13, marginBottom: 16
+              }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{tradeSession.errorMessage}</span>
+              </div>
+            )}
+
+            {/* Colunas Duplas de Negociação */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, flex: 1, overflow: "hidden", marginBottom: 20 }}>
+              
+              {/* Painel Esquerdo: Minhas Ofertas */}
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>Tu Ofereces</h4>
+                  {tradeSession.myAccepted ? (
+                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(46,204,113,0.15)", color: "#2ecc71", padding: "4px 10px", borderRadius: 100 }}>ACEITE PRONTO</span>
+                  ) : (
+                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", padding: "4px 10px", borderRadius: 100 }}>EM CONSTRUÇÃO</span>
+                  )}
+                </div>
+
+                {/* Seletor Rápido de Duplicadas */}
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Minhas Figurinhass Repetidas:</p>
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+                    {myDuplicates.length === 0 ? (
+                      <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>Nenhuma figurinha repetida no seu álbum.</span>
+                    ) : (
+                      myDuplicates.map(item => {
+                        const inOffer = tradeSession.myOffers.find(o => o.codigo === item.codigo);
+                        const offerQty = inOffer ? inOffer.quantity : 0;
+                        const available = item.quantity - offerQty - 1; // Deve sobrar pelo menos 1
+
+                        return (
+                          <button
+                            key={item.codigo}
+                            disabled={available <= 0}
+                            onClick={() => addStickerToOffer(item.codigo)}
+                            style={{
+                              flexShrink: 0, padding: "6px 12px", borderRadius: 10,
+                              background: available <= 0 ? "rgba(255,255,255,0.02)" : "var(--input-bg)",
+                              color: available <= 0 ? "rgba(255,255,255,0.1)" : "var(--text-main)",
+                              border: "1px solid rgba(255,255,255,0.08)", cursor: available <= 0 ? "default" : "pointer",
+                              fontSize: 12, fontWeight: 700
+                            }}
+                          >
+                            {item.codigo} <span style={{ color: "var(--warning)", marginLeft: 2 }}>x{item.quantity}</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Input Manual Opcional */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    placeholder="Código (Ex: BRA-1)"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                    style={{ flex: 1, background: "var(--input-bg)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px", color: "var(--text-main)", fontSize: 13, outline: "none" }}
+                  />
+                  <button
+                    onClick={() => addStickerToOffer(manualCode)}
+                    style={{ background: "var(--primary)", border: "none", color: "#fff", width: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+
+                {/* Lista de figurinhas oferecidas */}
+                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {tradeSession.myOffers.length === 0 ? (
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 14 }}>
+                      Nenhuma figurinha oferecida.
+                    </div>
+                  ) : (
+                    tradeSession.myOffers.map(offer => {
+                      const maxQty = (myInventory[offer.codigo] || 0) - 1; // restringe manter pelo menos 1
+                      return (
+                        <div key={offer.codigo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "10px 14px", borderRadius: 12 }}>
+                          <div>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>{offer.codigo}</span>
+                            <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 8 }}>Tenho: {myInventory[offer.codigo] || 0}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--input-bg)", borderRadius: 8, padding: "2px 6px" }}>
+                              <button onClick={() => updateOfferQuantity(offer.codigo, -1)} style={{ background: "transparent", border: "none", color: "var(--text-sec)", cursor: "pointer", fontSize: 14, fontWeight: "bold" }}>-</button>
+                              <span style={{ fontSize: 13, fontWeight: 700, minWidth: 16, textAlign: "center", color: "var(--text-main)" }}>{offer.quantity}</span>
+                              <button onClick={() => updateOfferQuantity(offer.codigo, 1)} style={{ background: "transparent", border: "none", color: "var(--text-sec)", cursor: "pointer", fontSize: 14, fontWeight: "bold" }}>+</button>
+                            </div>
+                            <button onClick={() => removeStickerFromOffer(offer.codigo)} style={{ background: "transparent", border: "none", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Painel Direito: Ofertas de Outro Colecionador */}
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>{otherUser.nome.split(" ")[0]} Oferece</h4>
+                  {tradeSession.otherAccepted ? (
+                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(46,204,113,0.15)", color: "#2ecc71", padding: "4px 10px", borderRadius: 100 }}>ACEITE PRONTO</span>
+                  ) : (
+                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", padding: "4px 10px", borderRadius: 100 }}>EM CONSTRUÇÃO</span>
+                  )}
+                </div>
+
+                {/* Lista de figurinhas oferecidas pelo outro */}
+                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {tradeSession.otherOffers.length === 0 ? (
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 14 }}>
+                      Nenhuma figurinha oferecida por {otherUser.nome.split(" ")[0]} ainda.
+                    </div>
+                  ) : (
+                    tradeSession.otherOffers.map(offer => (
+                      <div key={offer.codigo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "12px 16px", borderRadius: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>{offer.codigo}</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: "var(--warning)", background: "rgba(245,183,0,0.1)", padding: "4px 10px", borderRadius: 8 }}>
+                          Qtd: {offer.quantity}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Barra Inferior da Modal: Ações e Aceites */}
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+              {/* Status de Confirmação das Duas Partes */}
+              <div style={{ display: "flex", gap: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%", background: tradeSession.myAccepted ? "var(--success)" : "rgba(255,255,255,0.05)",
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>
+                    {tradeSession.myAccepted && <Check size={10} style={{ color: "#000" }} />}
+                  </div>
+                  <span style={{ fontSize: 13, color: "var(--text-sec)" }}>Eu</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%", background: tradeSession.otherAccepted ? "var(--success)" : "rgba(255,255,255,0.05)",
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>
+                    {tradeSession.otherAccepted && <Check size={10} style={{ color: "#000" }} />}
+                  </div>
+                  <span style={{ fontSize: 13, color: "var(--text-sec)" }}>{otherUser.nome.split(" ")[0]}</span>
+                </div>
+              </div>
+
+              {/* Botões de Ação do Painel */}
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={cancelTrade}
+                  style={{
+                    background: "rgba(255,77,106,0.1)", border: "1px solid rgba(255,77,106,0.2)",
+                    color: "var(--danger)", padding: "12px 24px", borderRadius: 14,
+                    fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all 0.2s"
+                  }}
+                >
+                  Recusar / Sair
+                </button>
+                <button
+                  onClick={toggleAccept}
+                  disabled={tradeSession.isExecuting}
+                  style={{
+                    background: tradeSession.isExecuting 
+                      ? "rgba(255,255,255,0.1)" 
+                      : (tradeSession.myAccepted ? "var(--success-light, #2ecc71)" : "var(--gradient-primary)"),
+                    color: tradeSession.myAccepted ? "#2ecc71" : "#fff",
+                    border: "none", padding: "12px 32px", borderRadius: 14,
+                    fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                    boxShadow: "0 8px 24px -4px rgba(0,174,239,0.2)", transition: "all 0.3s ease"
+                  }}
+                >
+                  {tradeSession.isExecuting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Efetuando Troca...
+                    </>
+                  ) : tradeSession.myAccepted ? (
+                    <>
+                      <Check size={16} />
+                      Aguardando {otherUser.nome.split(" ")[0]}...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} />
+                      Aceitar Troca
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Área de Mensagens do Chat */}
       <div 
         onScroll={handleScroll}
         style={{ flex: 1, overflowY: "auto", padding: "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}
@@ -287,12 +858,46 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           <div style={{ textAlign: "center", marginTop: "20%" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚽</div>
             <h3 style={{ color: "var(--text-main)", fontSize: 20, fontWeight: 700 }}>Inicia a Troca!</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: 15 }}>Diz olá ao {otherUser.nome.split(" ")[0]} e combina onde trocar as figurinhas.</p>
+            <p style={{ color: "var(--text-muted)", fontSize: 15 }}>Diz olá ao {otherUser.nome.split(" ")[0]}, combine onde se encontrar ou use o comando <strong>/troca</strong> para trocar figurinhas!</p>
           </div>
         ) : (
           messages.map((msg, i) => {
             const isMe = msg.sender_id === myUserId;
-            const showTime = true; // Could simplify logic
+            // Visual premium para logs de recibo de trocas automáticas do sistema
+            const isSystemTradeReceipt = msg.content.includes("🔄 TROCA DE FIGURINHAS CONCLUÍDA!");
+
+            if (isSystemTradeReceipt) {
+              return (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  style={{
+                    alignSelf: "center", width: "90%", margin: "16px 0",
+                    background: "linear-gradient(135deg, rgba(46,204,113,0.1), rgba(0,174,239,0.05))",
+                    border: "1px solid rgba(46,204,113,0.25)",
+                    borderRadius: 24, padding: "20px 24px",
+                    boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+                    position: "relative", overflow: "hidden"
+                  }}
+                >
+                  <div style={{
+                    position: "absolute", top: "-20%", right: "-10%", width: 100, height: 100,
+                    background: "#2ecc71", opacity: 0.1, filter: "blur(30px)", borderRadius: "50%"
+                  }} />
+                  <pre style={{
+                    color: "var(--text-main)", fontSize: 13, lineHeight: 1.6,
+                    margin: 0, fontFamily: "inherit", whiteSpace: "pre-wrap"
+                  }}>
+                    {msg.content}
+                  </pre>
+                  <span style={{ display: "block", fontSize: 10, color: "var(--text-muted)", marginTop: 12, textAlign: "right" }}>
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Sistema de Segurança Swap26
+                  </span>
+                </motion.div>
+              );
+            }
+
             return (
               <motion.div
                 key={msg.id}
@@ -317,12 +922,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 }}>
                   {msg.content}
                 </div>
-                {showTime && (
-                  <span style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4, padding: "0 4px" }}>
-                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    {isMe && msg.read && " · Lido"}
-                  </span>
-                )}
+                <span style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4, padding: "0 4px" }}>
+                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {isMe && msg.read && " · Lido"}
+                </span>
               </motion.div>
             );
           })
@@ -347,8 +950,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         </AnimatePresence>
         <div ref={bottomRef} />
       </div>
-
-      {/* Input Area */}
+ 
+      {/* Input de Mensagem */}
       <div style={{
         padding: "24px", background: "var(--bg-main-transparent)",
         backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255, 255, 255, 0.05)",
@@ -363,7 +966,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             <textarea
               value={input}
               onChange={(e) => handleTyping(e.target.value)}
-              placeholder="Mensagem..."
+              placeholder="Mensagem ou /troca..."
               style={{
                 width: "100%", background: "transparent", border: "none",
                 color: "var(--text-main)", fontSize: 15, padding: "12px 0",
@@ -396,7 +999,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           </button>
         </form>
       </div>
-
+ 
       <style jsx>{`
         .dot-pulse {
           animation: pulse 1s infinite alternate;
