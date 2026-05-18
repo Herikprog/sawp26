@@ -12,28 +12,30 @@ import { MessageCircle, Zap, MapPin, User } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 
-// Função para criar o pino premium do utilizador atual (bola azul flutuante de radar com foto de perfil)
+// Função para criar o pino premium do utilizador atual (bola azul flutuante de radar 7x MAIOR com foto de perfil)
 function createCurrentUserIcon(avatarUrl: string | null, nome: string) {
+  const size = 238;
+  const imgSize = 220;
   const innerHtml = avatarUrl 
-    ? `<img src="${avatarUrl}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />`
-    : `<div style="width: 26px; height: 26px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
+    ? `<img src="${avatarUrl}" style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; object-fit: cover;" />`
+    : `<div style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 72px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
 
   return L.divIcon({
     className: "my-profile-dot",
     html: `
-      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
-        <!-- Anel pulsante de radar azul -->
-        <div class="pulse-glow" style="position: absolute; inset: -6px; background: #00AEEF; border-radius: 50%; opacity: 0.3;"></div>
-        <!-- Bola azul flutuante brilhante sem ponta/direcional -->
-        <div style="position: absolute; inset: 0; background: #00AEEF; border-radius: 50%; box-shadow: 0 0 15px rgba(0,174,239,0.6); border: 2px solid #FFFFFF;"></div>
-        <!-- Foto de Perfil embutida -->
-        <div style="position: relative; z-index: 2; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
+      <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
+        <!-- Anel pulsante gigante de radar azul -->
+        <div class="pulse-glow" style="position: absolute; inset: -15px; background: #00AEEF; border-radius: 50%; opacity: 0.25;"></div>
+        <!-- Mega Bola azul flutuante brilhante sem ponta/direcional -->
+        <div style="position: absolute; inset: 0; background: #00AEEF; border-radius: 50%; box-shadow: 0 0 35px rgba(0,174,239,0.5); border: 5px solid #FFFFFF;"></div>
+        <!-- Foto de Perfil embutida gigante -->
+        <div style="position: relative; z-index: 2; width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
           ${innerHtml}
         </div>
       </div>
     `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17], // Fixa a ancoragem no centro absoluto do circulo da zona!
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2], // Fixa a ancoragem no centro absoluto do circulo da zona!
   });
 }
 
@@ -64,7 +66,7 @@ function createMatchUserIcon(avatarUrl: string | null, nome: string) {
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, 11, {
+    map.flyTo(center, 13, {
       animate: true,
       duration: 1.5
     });
@@ -107,7 +109,7 @@ export default function TradeMap({ matches }: Props) {
 
   return (
     <div style={{ width: "100%", height: "100%", borderRadius: 32, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 25px 80px -20px rgba(0,0,0,0.5)" }}>
-      <MapContainer center={center} zoom={11} style={{ width: "100%", height: "100%", background: "var(--bg-main)" }}>
+      <MapContainer center={center} zoom={13} style={{ width: "100%", height: "100%", background: "var(--bg-main)" }}>
         <ChangeView center={center} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -115,7 +117,7 @@ export default function TradeMap({ matches }: Props) {
         />
 
         {/* User's approximate area */}
-        <Circle center={center} radius={5600} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.1, weight: 1, dashArray: "5, 10" }} />
+        <Circle center={center} radius={800} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.1, weight: 1, dashArray: "5, 10" }} />
 
         {/* Bola de perfil flutuante e centralizada representativa da sua zona de cobertura de radar */}
         {myProfile && (
