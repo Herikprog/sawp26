@@ -289,7 +289,16 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
                       position: "relative", background: isSpecial ? "var(--text-main)" : "var(--input-bg)",
                       border: "1px solid var(--border-light)", flexShrink: 0,
                     }}>
-                      <Image src={getFlagByCountry(cat)} alt={cat} fill sizes="100px" style={{ objectFit: isSpecial ? "contain" : "cover", padding: isSpecial ? 4 : 0 }} />
+                      <img 
+                        src={getFlagByCountry(cat)} 
+                        alt={cat} 
+                        style={{ 
+                          width: "100%", 
+                          height: "100%", 
+                          objectFit: isSpecial ? "contain" : "cover", 
+                          padding: isSpecial ? 4 : 0 
+                        }} 
+                      />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-main)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat}</h3>

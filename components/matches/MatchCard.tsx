@@ -44,7 +44,9 @@ export default function MatchCard({ match, myUserId, index }: Props) {
     router.push(`/chat/${created.id}`);
   }
 
-  const mutual = Math.min(match.stickers_tem.length, match.stickers_precisa.length);
+  const stickersTem = match.stickers_tem ?? [];
+  const stickersPrecisa = match.stickers_precisa ?? [];
+  const mutual = Math.min(stickersTem.length, stickersPrecisa.length);
   const scoreColor = match.score >= 80 ? "var(--success)" : match.score >= 50 ? "var(--primary)" : "var(--warning)";
 
   return (
@@ -151,9 +153,9 @@ export default function MatchCard({ match, myUserId, index }: Props) {
         {/* Stats Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
           {[
-            { value: match.stickers_tem.length, label: "Ele tem\nque me falta", color: "var(--success)", bg: "var(--success-light)", icon: "📥" },
+            { value: stickersTem.length, label: "Ele tem\nque me falta", color: "var(--success)", bg: "var(--success-light)", icon: "📥" },
             { value: mutual, label: "Trocas\nPossíveis", color: "var(--primary)", bg: "var(--primary-light)", icon: "🔄" },
-            { value: match.stickers_precisa.length, label: "Eu tenho\nque lhe falta", color: "var(--warning)", bg: "var(--warning-light)", icon: "📤" },
+            { value: stickersPrecisa.length, label: "Eu tenho\nque lhe falta", color: "var(--warning)", bg: "var(--warning-light)", icon: "📤" },
           ].map(({ value, label, color, bg, icon }) => (
             <div key={label} style={{
               padding: "14px 10px", borderRadius: 16, background: bg,
