@@ -29,6 +29,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const typingBroadcastInterval = useRef<NodeJS.Timeout | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const receiverTypingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isFirstRender = useRef(true);
   const supabase = createClient();
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -37,7 +38,12 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   };
 
   useEffect(() => {
-    if (isScrolledToBottom.current) {
+    if (isFirstRender.current) {
+      // Abre a tela já posicionada no final de forma instantânea
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      isFirstRender.current = false;
+    } else if (isScrolledToBottom.current) {
+      // Rola suavemente apenas para novas mensagens/digitação
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isTyping]);
