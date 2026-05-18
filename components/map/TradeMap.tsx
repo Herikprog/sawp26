@@ -12,31 +12,6 @@ import { MessageCircle, Zap, MapPin, User } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 
-// Função para criar o pino premium do utilizador atual (verde pulsante com foto de perfil)
-function createCurrentUserIcon(avatarUrl: string | null, nome: string) {
-  const innerHtml = avatarUrl 
-    ? `<img src="${avatarUrl}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />`
-    : `<div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
-
-  return L.divIcon({
-    className: "my-profile-pin",
-    html: `
-      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
-        <!-- Anel pulsante de geolocalização ativa -->
-        <div class="pulse-glow" style="position: absolute; inset: -4px; background: #10b981; border-radius: 50%; opacity: 0.35;"></div>
-        <!-- Pointer drop verde emerald -->
-        <div style="position: absolute; width: 34px; height: 34px; background: #10b981; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); box-shadow: 0 4px 15px rgba(16,185,129,0.4); border: 2px solid #FFFFFF;"></div>
-        <!-- Foto de Perfil embutida -->
-        <div style="position: relative; z-index: 2; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
-          ${innerHtml}
-        </div>
-      </div>
-    `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 34],
-  });
-}
-
 // Função para criar o pino premium das matches (azul brilhante com foto de perfil)
 function createMatchUserIcon(avatarUrl: string | null, nome: string) {
   const innerHtml = avatarUrl 
@@ -116,18 +91,6 @@ export default function TradeMap({ matches }: Props) {
 
         {/* User's approximate area */}
         <Circle center={center} radius={800} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.1, weight: 1, dashArray: "5, 10" }} />
-
-        {/* Marcador do Utilizador Atual (Foto de Perfil com Pulsação de Localização) */}
-        {myProfile && (
-          <Marker position={center} icon={createCurrentUserIcon(myProfile.avatar_url, myProfile.nome)}>
-            <Popup className="premium-popup">
-              <div style={{ padding: "16px", minWidth: 200, background: "var(--card-bg)", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-main)", textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "var(--success)" }}>Minha Localização</p>
-                <p style={{ margin: "4px 0 0 0", fontSize: 11, color: "var(--text-muted)" }}>Estás posicionado aqui no radar!</p>
-              </div>
-            </Popup>
-          </Marker>
-        )}
 
         {matches.map((match) => {
           // Simulate position for privacy
