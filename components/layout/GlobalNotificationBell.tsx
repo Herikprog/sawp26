@@ -60,7 +60,8 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
     loadNotifications();
 
     // Ouvir mudanças em tempo real na tabela de notificações
-    const channel = supabase.channel("global-bell-notifs")
+    const channelName = `global-bell-notifs-${isMobile ? "mobile" : "desktop"}`;
+    const channel = supabase.channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "social_notifications" },
@@ -73,7 +74,7 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [supabase, isMobile]);
 
   // Marcar todas como lidas manualmente (Melhoria do sistema!)
   async function handleMarkAllAsRead() {
