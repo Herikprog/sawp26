@@ -5,6 +5,18 @@ const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 
 const supabase = createClient(url, serviceKey);
 
+function decodeWKB(wkbHex) {
+  if (!wkbHex) return null;
+  try {
+    const buf = Buffer.from(wkbHex, 'hex');
+    const lon = buf.readDoubleLE(9);
+    const lat = buf.readDoubleLE(17);
+    return { lat, lon };
+  } catch (e) {
+    return null;
+  }
+}
+
 async function run() {
   const userId = 'a3d0d068-622d-42e4-aca0-967a9674a02f'; // bragawork01@gmail.com
   
@@ -25,9 +37,10 @@ async function run() {
 
   if (userProfile && userProfile.location) {
     console.log('Localização encontrada no seu utilizador:', userProfile.location);
-    if (userProfile.location.coordinates) {
-      baseLng = userProfile.location.coordinates[0];
-      baseLat = userProfile.location.coordinates[1];
+    const coords = decodeWKB(userProfile.location);
+    if (coords) {
+      baseLng = coords.lon;
+      baseLat = coords.lat;
       console.log(`Localização ativa do utilizador capturada: Lat ${baseLat}, Lng ${baseLng}`);
     }
   } else {
