@@ -69,7 +69,14 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       )
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
-        const typingUsers = Object.values(state).flat().filter((u: any) => u.typing && u.user_id !== myUserId);
+        console.log("Presence sync state:", state, "myUserId:", myUserId);
+        
+        // Filtra rigidamente pela chave do outro usuário e garante o valor booleano true
+        const typingUsers = Object.entries(state)
+          .filter(([key]) => key !== myUserId)
+          .flatMap(([_, presences]) => presences)
+          .filter((presence: any) => presence.typing === true);
+
         setIsTyping(typingUsers.length > 0);
       })
       .subscribe(async (status: string) => {
