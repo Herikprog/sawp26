@@ -31,29 +31,32 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   useEffect(() => {
     const channel = supabase.channel(`room:${conversationId}`, {
       config: {
-        broadcast: { ack: true, self: false },
         presence: { key: myUserId },
       },
     });
 
     channel
-      .on("broadcast", { event: "new_message" }, (payload: any) => {
-        const newMsg = payload.payload as Message;
-        if (newMsg.sender_id !== myUserId) {
-          setMessages((prev) => {
-            if (prev.find((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
+        (payload: any) => {
+          const newMsg = payload.new as Message;
+          if (newMsg.sender_id !== myUserId) {
+            setMessages((prev) => {
+              if (prev.find((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
         }
-      })
-      .on("broadcast", { event: "messages_read" }, (payload: any) => {
-        const { conversationId: cid, readerId } = payload.payload;
-        if (cid === conversationId && readerId !== myUserId) {
-          setMessages(prev => prev.map(m => 
-            m.sender_id === myUserId ? { ...m, read: true } : m
-          ));
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
+        (payload: any) => {
+          const updatedMsg = payload.new as Message;
+          setMessages((prev) => prev.map((m) => m.id === updatedMsg.id ? updatedMsg : m));
         }
-      })
+      )
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         const typingUsers = Object.values(state).flat().filter((u: any) => u.typing && u.user_id !== myUserId);
@@ -83,15 +86,6 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           .eq("conversation_id", conversationId)
           .not("sender_id", "eq", myUserId)
           .eq("read", false);
-        
-        // Broadcast that I read the messages
-        if (channelRef.current) {
-          channelRef.current.send({
-            type: "broadcast",
-            event: "messages_read",
-            payload: { conversationId, readerId: myUserId }
-          });
-        }
       }
     }
     markAsRead();
@@ -142,14 +136,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     // Replace optimistic message with real message
     setMessages((prev) => prev.map((m) => m.id === tempId ? savedMsg : m));
 
-    // Broadcast the REAL message to the other user
+    // Reset typing status
     if (channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "new_message",
-        payload: savedMsg,
-      }).catch(console.error);
-      
       channelRef.current.track({ user_id: myUserId, typing: false }).catch(console.error);
     }
   }
