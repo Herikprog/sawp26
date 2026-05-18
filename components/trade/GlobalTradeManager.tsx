@@ -205,8 +205,24 @@ export default function GlobalTradeManager() {
         (payload: any) => {
           const tradeRow = payload.new;
           if (tradeRow && tradeRow.id === outgoingCall.id) {
-            if (tradeRow.status === "completed" || tradeRow.status === "accepted") {
-              toast.success(`🏆 A sua proposta de troca foi ACEITA e concluída com sucesso!`);
+            if (tradeRow.status === "accepted") {
+              toast.success("🏆 Chamada de troca aceite! A entrar no painel de negociação...");
+              
+              supabase
+                .from("conversations")
+                .select("id")
+                .or(`and(user_a_id.eq.${currentUser?.id},user_b_id.eq.${outgoingCall.receiver_id}),and(user_a_id.eq.${outgoingCall.receiver_id},user_b_id.eq.${currentUser?.id})`)
+                .maybeSingle()
+                .then(({ data: conv }: any) => {
+                  if (conv) {
+                    window.location.href = `/chat/${conv.id}?tradeId=${outgoingCall.id}`;
+                  }
+                });
+
+              setOutgoingCall(null);
+              setReceiverProfile(null);
+            } else if (tradeRow.status === "completed") {
+              toast.success("🏆 A sua troca foi concluída com sucesso!");
               setOutgoingCall(null);
               setReceiverProfile(null);
             } else if (tradeRow.status === "rejected") {
@@ -269,59 +285,19 @@ export default function GlobalTradeManager() {
         conv = newConv;
       }
 
-      // B. Traduzir IDs de figurinhas para códigos em tempo real para a RPC execute_sticker_trade
-      const allStickerIds = [...incomingCall.offered_stickers, ...incomingCall.wanted_stickers];
-      let stickersData: any[] = [];
-      if (allStickerIds.length > 0) {
-        const { data } = await supabase
-          .from("stickers")
-          .select("id, codigo")
-          .in("id", allStickerIds);
-        if (data) stickersData = data;
-      }
-
-      const idToCode: Record<number, string> = {};
-      stickersData.forEach(s => {
-        idToCode[s.id] = s.codigo;
-      });
-
-      const offeredList = incomingCall.offered_stickers.map((id: number) => ({
-        codigo: idToCode[id] || stickersMap[id] || `Fig. ${id}`,
-        quantity: 1
-      }));
-      
-      const wantedList = incomingCall.wanted_stickers.map((id: number) => ({
-        codigo: idToCode[id] || stickersMap[id] || `Fig. ${id}`,
-        quantity: 1
-      }));
-
-      // C. Chamar a procedure transacionada segura execute_sticker_trade
-      const { data, error: rpcErr } = await supabase.rpc("execute_sticker_trade", {
-        p_conversation_id: conv.id,
-        p_user_a_id: incomingCall.initiator_id, // Initiator A
-        p_user_b_id: currentUser.id,          // Receiver B
-        p_user_a_offers: offeredList,
-        p_user_b_offers: wantedList
-      });
-
-      if (rpcErr) throw rpcErr;
-
-      // D. Atualizar status da chamada para completada
+      // B. Atualizar status da chamada para aceita (accepted) no banco de dados
       await supabase
         .from("trades")
-        .update({ status: "completed", updated_at: new Date().toISOString() })
+        .update({ status: "accepted", updated_at: new Date().toISOString() })
         .eq("id", incomingCall.id);
 
-      toast.success("🏆 Troca efetuada com sucesso! Os seus álbuns foram atualizados.");
+      toast.success("🏆 Chamada de troca aceita! A entrar no painel de negociação...");
+
+      // C. Redirecionar para o chat com o tradeId
+      window.location.href = `/chat/${conv.id}?tradeId=${incomingCall.id}`;
     } catch (err: any) {
-      console.error("Trade transaction failed:", err);
-      toast.error(`Falha ao concluir troca: ${err.message || "Erro desconhecido"}`);
-      
-      // Se der erro, colocar como rejeitada ou cancelada
-      await supabase
-        .from("trades")
-        .update({ status: "rejected" })
-        .eq("id", incomingCall.id);
+      console.error("Failed to accept trade invitation:", err);
+      toast.error(`Falha ao aceitar chamada: ${err.message || "Erro desconhecido"}`);
     } finally {
       setLoading(false);
       setIncomingCall(null);

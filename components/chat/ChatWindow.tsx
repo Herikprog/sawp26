@@ -109,6 +109,98 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     loadInventory();
   }, [tradeSession.isActive]);
 
+  // Carregar proposta de troca pré-selecionada da URL (Chamada telefônica direta)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tradeId = params.get("tradeId");
+    if (!tradeId) return;
+
+    async function loadTradeInvite() {
+      try {
+        const { data: trade, error } = await supabase
+          .from("trades")
+          .select("*")
+          .eq("id", tradeId)
+          .single();
+
+        if (error || !trade) return;
+
+        // Se o status da troca não for pending ou accepted, não abrir
+        if (trade.status !== "pending" && trade.status !== "accepted") return;
+
+        const offeredIds = trade.offered_stickers || [];
+        const wantedIds = trade.wanted_stickers || [];
+
+        // Traduzir IDs das figurinhas para códigos
+        const allIds = [...offeredIds, ...wantedIds];
+        if (allIds.length === 0) return;
+
+        const { data: stickers } = await supabase
+          .from("stickers")
+          .select("id, codigo")
+          .in("id", allIds);
+
+        if (!stickers) return;
+
+        const idToCode: Record<number, string> = {};
+        stickers.forEach((s: any) => {
+          idToCode[s.id] = s.codigo;
+        });
+
+        // Montar ofertas do ponto de vista deste utilizador
+        const isInitiator = myUserId === trade.initiator_id;
+
+        const initiatorOffers = offeredIds.map((id: number) => ({
+          codigo: idToCode[id] || `Fig. ${id}`,
+          quantity: 1
+        }));
+
+        const receiverOffers = wantedIds.map((id: number) => ({
+          codigo: idToCode[id] || `Fig. ${id}`,
+          quantity: 1
+        }));
+
+        const myOffers = isInitiator ? initiatorOffers : receiverOffers;
+        const otherOffers = isInitiator ? receiverOffers : initiatorOffers;
+
+        setTradeSession({
+          isActive: true,
+          myOffers,
+          otherOffers,
+          myAccepted: false,
+          otherAccepted: false,
+          errorMessage: "",
+          isExecuting: false
+        });
+
+        // Limpar o query param tradeId da URL de forma elegante
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
+
+        // Notificar o outro colecionador via broadcast para carregar e abrir na tela dele também!
+        setTimeout(() => {
+          if (channelRef.current) {
+            channelRef.current.send({
+              type: "broadcast",
+              event: "trade_sync",
+              payload: {
+                userId: myUserId,
+                offers: myOffers,
+                accepted: false,
+                isActive: true
+              }
+            });
+          }
+        }, 1200);
+
+      } catch (err) {
+        console.error("Failed to load prefilled trade proposal:", err);
+      }
+    }
+    loadTradeInvite();
+  }, [supabase, myUserId]);
+
   // WebSocket / Supabase Realtime Channels
   useEffect(() => {
     const channel = supabase.channel(`room:${conversationId}`, {
