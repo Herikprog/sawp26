@@ -173,7 +173,7 @@ export default function GlobalTradeManager() {
     };
   }, [currentUser, supabase]);
 
-  // 3. Ouvir atualizações da nossa própria chamada enviada (Outgoing Calls)
+  // 3a. Carregar perfil do destinatário da chamada enviada
   useEffect(() => {
     if (!outgoingCall) return;
 
@@ -188,26 +188,29 @@ export default function GlobalTradeManager() {
       }
     }
     fetchReceiverProfile(outgoingCall.receiver_id);
+  }, [outgoingCall, supabase]);
 
-    // Ouvir updates especificamente nessa linha da chamada
-    outgoingSubscription.current = supabase.channel(`outgoing-trade-${outgoingCall.id}`)
+  // 3b. Ouvir atualizações em tempo real da chamada enviada (sem race conditions)
+  useEffect(() => {
+    if (!outgoingCall) return;
+
+    const channel = supabase.channel(`outgoing-trade-${outgoingCall.id}`)
       .on(
         "postgres_changes",
         {
           event: "UPDATE",
           schema: "public",
-          table: "trades",
-          filter: `id=eq.${outgoingCall.id}`
+          table: "trades"
         },
         (payload: any) => {
           const tradeRow = payload.new;
-          if (tradeRow) {
+          if (tradeRow && tradeRow.id === outgoingCall.id) {
             if (tradeRow.status === "completed" || tradeRow.status === "accepted") {
-              toast.success(`🏆 A sua proposta de troca com ${receiverProfile?.nome || "o utilizador"} foi ACEITA e concluída!`);
+              toast.success(`🏆 A sua proposta de troca foi ACEITA e concluída com sucesso!`);
               setOutgoingCall(null);
               setReceiverProfile(null);
             } else if (tradeRow.status === "rejected") {
-              toast.error(`❌ A sua proposta de troca foi recusada por ${receiverProfile?.nome || "o utilizador"}.`);
+              toast.error(`❌ A sua proposta de troca foi recusada.`);
               setOutgoingCall(null);
               setReceiverProfile(null);
             } else if (tradeRow.status === "cancelled") {
@@ -220,11 +223,9 @@ export default function GlobalTradeManager() {
       .subscribe();
 
     return () => {
-      if (outgoingSubscription.current) {
-        supabase.removeChannel(outgoingSubscription.current);
-      }
+      supabase.removeChannel(channel);
     };
-  }, [outgoingCall, receiverProfile, supabase]);
+  }, [outgoingCall, supabase]);
 
   // 4. Ouvir propostas que nós criamos via evento do window (integração flexível com ChatWindow)
   useEffect(() => {
@@ -268,14 +269,29 @@ export default function GlobalTradeManager() {
         conv = newConv;
       }
 
-      // B. Traduzir IDs de figurinhas para códigos para a RPC execute_sticker_trade
+      // B. Traduzir IDs de figurinhas para códigos em tempo real para a RPC execute_sticker_trade
+      const allStickerIds = [...incomingCall.offered_stickers, ...incomingCall.wanted_stickers];
+      let stickersData: any[] = [];
+      if (allStickerIds.length > 0) {
+        const { data } = await supabase
+          .from("stickers")
+          .select("id, codigo")
+          .in("id", allStickerIds);
+        if (data) stickersData = data;
+      }
+
+      const idToCode: Record<number, string> = {};
+      stickersData.forEach(s => {
+        idToCode[s.id] = s.codigo;
+      });
+
       const offeredList = incomingCall.offered_stickers.map((id: number) => ({
-        codigo: stickersMap[id] || `Fig. ${id}`,
+        codigo: idToCode[id] || stickersMap[id] || `Fig. ${id}`,
         quantity: 1
       }));
       
       const wantedList = incomingCall.wanted_stickers.map((id: number) => ({
-        codigo: stickersMap[id] || `Fig. ${id}`,
+        codigo: idToCode[id] || stickersMap[id] || `Fig. ${id}`,
         quantity: 1
       }));
 
