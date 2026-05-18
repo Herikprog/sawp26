@@ -12,23 +12,23 @@ import { MessageCircle, Zap, MapPin, User } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 
-// Função para criar o pino premium do utilizador atual (bola azul flutuante de radar 7x MAIOR com foto de perfil)
+// Função para criar o pino premium do utilizador atual (bola azul flutuante de radar calibrada de 96px com foto de perfil)
 function createCurrentUserIcon(avatarUrl: string | null, nome: string) {
-  const size = 238;
-  const imgSize = 220;
+  const size = 96;
+  const imgSize = 84;
   const innerHtml = avatarUrl 
     ? `<img src="${avatarUrl}" style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; object-fit: cover;" />`
-    : `<div style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 72px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
+    : `<div style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
 
   return L.divIcon({
     className: "my-profile-dot",
     html: `
       <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
-        <!-- Anel pulsante gigante de radar azul -->
-        <div class="pulse-glow" style="position: absolute; inset: -15px; background: #00AEEF; border-radius: 50%; opacity: 0.25;"></div>
-        <!-- Mega Bola azul flutuante brilhante sem ponta/direcional -->
-        <div style="position: absolute; inset: 0; background: #00AEEF; border-radius: 50%; box-shadow: 0 0 35px rgba(0,174,239,0.5); border: 5px solid #FFFFFF;"></div>
-        <!-- Foto de Perfil embutida gigante -->
+        <!-- Anel pulsante calibrado de radar azul -->
+        <div class="pulse-glow" style="position: absolute; inset: -8px; background: #00AEEF; border-radius: 50%; opacity: 0.25;"></div>
+        <!-- Bola azul flutuante brilhante sem ponta/direcional -->
+        <div style="position: absolute; inset: 0; background: #00AEEF; border-radius: 50%; box-shadow: 0 0 20px rgba(0,174,239,0.5); border: 3px solid #FFFFFF;"></div>
+        <!-- Foto de Perfil embutida calibrada -->
         <div style="position: relative; z-index: 2; width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
           ${innerHtml}
         </div>
