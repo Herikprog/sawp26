@@ -64,7 +64,7 @@ function createMatchUserIcon(avatarUrl: string | null, nome: string) {
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, 13, {
+    map.flyTo(center, 11, {
       animate: true,
       duration: 1.5
     });
@@ -107,7 +107,7 @@ export default function TradeMap({ matches }: Props) {
 
   return (
     <div style={{ width: "100%", height: "100%", borderRadius: 32, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 25px 80px -20px rgba(0,0,0,0.5)" }}>
-      <MapContainer center={center} zoom={13} style={{ width: "100%", height: "100%", background: "var(--bg-main)" }}>
+      <MapContainer center={center} zoom={11} style={{ width: "100%", height: "100%", background: "var(--bg-main)" }}>
         <ChangeView center={center} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -115,7 +115,7 @@ export default function TradeMap({ matches }: Props) {
         />
 
         {/* User's approximate area */}
-        <Circle center={center} radius={800} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.1, weight: 1, dashArray: "5, 10" }} />
+        <Circle center={center} radius={5600} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.1, weight: 1, dashArray: "5, 10" }} />
 
         {/* Bola de perfil flutuante e centralizada representativa da sua zona de cobertura de radar */}
         {myProfile && (
