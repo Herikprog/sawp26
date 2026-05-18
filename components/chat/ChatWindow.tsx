@@ -20,14 +20,24 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [connStatus, setConnStatus] = useState<"connecting" | "connected" | "offline">("connecting");
+  
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
   const amITyping = useRef(false);
+  const isScrolledToBottom = useRef(true);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const supabase = createClient();
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    isScrolledToBottom.current = scrollHeight - scrollTop - clientHeight < 50;
+  };
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isScrolledToBottom.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isTyping]);
 
   useEffect(() => {
@@ -64,8 +74,11 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       })
       .subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
+          setConnStatus("connected");
           channelRef.current = channel;
           await channel.track({ user_id: myUserId, typing: false });
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+          setConnStatus("offline");
         }
       });
 
@@ -122,11 +135,21 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     const content = input.trim();
     setInput("");
     
-    // Removido o update otimista. A interface irá atualizar automaticamente 
-    // assim que o evento do postgres_changes chegar (milissegundos), garantindo 100% consistência.
+    // Geração de ID nativo: A interface atualiza a 0ms de latência.
+    const newId = crypto.randomUUID();
+    const optimisticMsg: Message = {
+      id: newId as any,
+      conversation_id: conversationId,
+      sender_id: myUserId,
+      content,
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    
+    setMessages((prev) => [...prev, optimisticMsg]);
 
-    // Save to database sem select() para evitar falsos erros de RLS
     const { error } = await supabase.from("messages").insert({
+      id: newId,
       conversation_id: conversationId,
       sender_id: myUserId,
       content,
@@ -134,6 +157,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
     if (error) {
       console.error("Failed to save message:", error);
+      // Remove da tela caso o banco negue o salvamento (ex: falta de internet)
+      setMessages((prev) => prev.filter((m) => m.id !== newId));
       return;
     }
 
@@ -181,7 +206,14 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             )}
           </div>
           <div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>{otherUser.nome}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <p style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)", margin: 0 }}>{otherUser.nome}</p>
+              <div style={{ 
+                width: 6, height: 6, borderRadius: "50%", 
+                background: connStatus === "connected" ? "var(--success)" : (connStatus === "connecting" ? "var(--warning, #f5a623)" : "var(--danger)"),
+                boxShadow: connStatus === "connected" ? "0 0 6px var(--success)" : "none"
+              }} title={`Status: ${connStatus}`} />
+            </div>
             <p style={{ fontSize: 12, color: otherUser.is_online ? "var(--success)" : "var(--text-muted)", margin: 0 }}>
               {otherUser.is_online ? "Online agora" : `Visto há ${timeAgo(otherUser.last_seen)}`}
             </p>
@@ -198,7 +230,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       </div>
 
       {/* Message Area */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div 
+        onScroll={handleScroll}
+        style={{ flex: 1, overflowY: "auto", padding: "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}
+      >
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", marginTop: "20%" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚽</div>
