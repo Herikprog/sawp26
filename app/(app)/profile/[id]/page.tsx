@@ -8,6 +8,7 @@ import FollowButton from "@/components/profile/FollowButton";
 import ReportButton from "@/components/profile/ReportButton";
 import FollowStats from "@/components/profile/FollowStats";
 import AlbumGrid from "@/components/album/AlbumGrid";
+import TradeCallButton from "@/components/profile/TradeCallButton";
 
 interface Props {
   params: { id: string };
@@ -172,6 +173,7 @@ export default async function PublicProfilePage({ params }: Props) {
             }} className="hover:scale-105">
               <MessageCircle size={18} /> Iniciar Chat
             </Link>
+            <TradeCallButton targetUserId={id} />
             <ReportButton />
           </div>
         </div>

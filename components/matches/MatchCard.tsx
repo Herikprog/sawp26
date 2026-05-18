@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import type { MatchResult } from "@/types";
 import { formatDistance } from "@/lib/utils";
-import { MessageCircle, Shuffle, Star, MapPin, ChevronRight, Zap, TrendingUp, User, BookOpen } from "lucide-react";
+import { MessageCircle, Shuffle, Star, MapPin, ChevronRight, Zap, TrendingUp, User, BookOpen, PhoneCall, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -49,6 +50,44 @@ export default function MatchCard({ match, myUserId, index }: Props) {
   const stickersPrecisa = match.stickers_precisa ?? [];
   const mutual = Math.min(stickersTem.length, stickersPrecisa.length);
   const scoreColor = match.score >= 80 ? "var(--success)" : match.score >= 50 ? "var(--primary)" : "var(--warning)";
+
+  const [loadingCall, setLoadingCall] = useState(false);
+
+  async function startDirectTradeCall() {
+    if (stickersTem.length === 0 && stickersPrecisa.length === 0) {
+      toast.error("Vocês não possuem figurinhas compatíveis para troca!");
+      return;
+    }
+
+    setLoadingCall(true);
+    try {
+      const { data: newTrade, error } = await supabase
+        .from("trades")
+        .insert({
+          initiator_id: myUserId,
+          receiver_id: match.user_id,
+          offered_stickers: stickersPrecisa,
+          wanted_stickers: stickersTem,
+          status: "pending"
+        })
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      toast.success("📞 Chamada de troca direta enviada!");
+
+      // Disparar o modal global de chamada ativa
+      window.dispatchEvent(new CustomEvent("trigger_outgoing_trade", { 
+        detail: { trade: newTrade } 
+      }));
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Erro ao iniciar chamada: ${err.message || "Erro desconhecido"}`);
+    } finally {
+      setLoadingCall(false);
+    }
+  }
 
   return (
     <motion.div
@@ -174,6 +213,35 @@ export default function MatchCard({ match, myUserId, index }: Props) {
 
         {/* Actions Grid */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+          {/* Direct Calling Trade */}
+          <button
+            onClick={startDirectTradeCall}
+            disabled={loadingCall}
+            style={{
+              width: "100%", padding: "14px", borderRadius: 14,
+              background: "linear-gradient(135deg, #f5b700 0%, #e0a300 100%)", color: "#1A1100", fontWeight: 800,
+              fontSize: 14, display: "flex", alignItems: "center",
+              justifyContent: "center", gap: 8, border: "none", cursor: "pointer",
+              boxShadow: "0 8px 24px -4px rgba(245,183,0,0.25)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = "0 12px 32px -4px rgba(245,183,0,0.4)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = "0 8px 24px -4px rgba(245,183,0,0.25)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            {loadingCall ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <PhoneCall size={16} />
+            )}
+            Ligar para Trocar Direto
+          </button>
+
           {/* Primary Action: Chat */}
           <button
             onClick={openChat}
