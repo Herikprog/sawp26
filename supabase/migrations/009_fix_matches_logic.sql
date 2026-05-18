@@ -63,7 +63,7 @@ BEGIN
         AND us.sticker_id NOT IN (SELECT sticker_id FROM minhas_obtidas) -- Ele tem o que eu NÃO tenho
     ),
     ARRAY(
-      SELECT us.sticker_id FROM stickers s
+      SELECT s.id FROM stickers s
       WHERE s.id NOT IN (SELECT sticker_id FROM user_stickers WHERE user_id = p.id AND quantity >= 1) -- O que ele NÃO tem
         AND s.id IN (SELECT sticker_id FROM minhas_repetidas) -- Mas eu tenho repetido
     ),
