@@ -6,10 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function SettingsPage() {
   const supabase = createClient();
   const { theme, setTheme } = useTheme();
+  const { subscribeToPushNotifications, unsubscribeFromPushNotifications } = usePushNotifications();
   
   const [mounted, setMounted] = useState(false);
   const [notifications, setNotifications] = useState(true);
@@ -30,8 +32,22 @@ export default function SettingsPage() {
     window.location.href = "/login";
   }
 
-  function toggleNotifications() {
+  async function toggleNotifications() {
     const next = !notifications;
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      if (next) {
+        const success = await subscribeToPushNotifications(user.id);
+        if (!success) {
+          toast.error("Não foi possível ativar as notificações no browser.");
+          return;
+        }
+      } else {
+        await unsubscribeFromPushNotifications(user.id);
+      }
+    }
+
     setNotifications(next);
     localStorage.setItem("swap26_notifs", String(next));
     toast.success(next ? "Notificações ligadas!" : "Notificações desligadas", { icon: next ? "🔔" : "🔕" });

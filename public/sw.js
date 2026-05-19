@@ -19,8 +19,8 @@ self.addEventListener("push", function (event) {
   const title = payload.title || "Nova Notificação";
   const options = {
     body: payload.body || "Tem uma nova atualização na sua conta!",
-    icon: payload.icon || "/file.svg", // Ícone que representa a app
-    badge: payload.badge || "/file.svg", // Ícone pequeno na barra de estado (Android)
+    icon: payload.icon || "/icon-192.png", // Ícone que representa a app
+    badge: payload.badge || "/icon-192.png", // Ícone pequeno na barra de estado (Android)
     vibrate: [100, 50, 100],
     data: {
       url: payload.url || "/feed" // URL para onde redirecionar no clique

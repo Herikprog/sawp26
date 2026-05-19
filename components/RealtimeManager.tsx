@@ -18,8 +18,10 @@ export default function RealtimeManager() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
-        // Registar o browser do utilizador para receber push nativo
-        await subscribeToPushNotifications(user.id);
+        // Apenas atualizar silenciosamente se a permissão já foi explicitamente concedida
+        if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+          await subscribeToPushNotifications(user.id);
+        }
       } catch (err) {
         console.error("Erro ao inicializar notificações push:", err);
       }

@@ -2,28 +2,34 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
-// Configurar as credenciais VAPID de encriptação
-const vapidPublicKey =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  "BGFxJ-VgRWYKUnG1i4n1lFK22yjVRwhl_MLBvcC4w098xt9IJlqgMq2HY3ENXzTzAi4k97O7KSHD0HlEv0g_ddU";
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 
-const vapidPrivateKey =
-  process.env.VAPID_PRIVATE_KEY ||
-  "00puuJYUbSYS5ZOkfOT_dNaQoFqsq9MTjxeBiWxZrFQ";
-
-webpush.setVapidDetails(
-  "mailto:suporte@swap26.com",
-  vapidPublicKey,
-  vapidPrivateKey
-);
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    "mailto:suporte@swap26.com",
+    vapidPublicKey,
+    vapidPrivateKey
+  );
+}
 
 // Instanciar o cliente administrativo do Supabase para ignorar políticas RLS na leitura das subscrições
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole || "placeholder-to-prevent-supabase-sdk-crash");
 
 export async function POST(request: Request) {
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.error("VAPID Keys não configuradas nas variáveis de ambiente da Vercel.");
+    return NextResponse.json({ error: "VAPID Keys não configuradas." }, { status: 500 });
+  }
+
+  if (!supabaseServiceRole) {
+    console.error("SUPABASE_SERVICE_ROLE_KEY não configurada nas variáveis de ambiente da Vercel.");
+    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada." }, { status: 500 });
+  }
+
   try {
     // Obter o payload enviado pelo Webhook do Supabase
     const body = await request.json();
@@ -141,7 +147,7 @@ export async function POST(request: Request) {
         title: pushTitle,
         body: pushBody,
         url: pushUrl,
-        icon: "/file.svg"
+        icon: "/icon-192.png"
       });
 
       try {
