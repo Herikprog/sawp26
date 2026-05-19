@@ -1144,7 +1144,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                     {msg.content}
                   </pre>
                   <span style={{ display: "block", fontSize: 10, color: "var(--text-muted)", marginTop: 12, textAlign: "right" }}>
-                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Sistema de Segurança Swap26
+                    {mounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."} · Sistema de Segurança Swap26
                   </span>
                 </motion.div>
               );
@@ -1180,7 +1180,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                   {msg.content}
                 </div>
                 <span style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4, padding: "0 4px" }}>
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {mounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."}
                   {isMe && msg.read && " · Lido"}
                 </span>
               </motion.div>
