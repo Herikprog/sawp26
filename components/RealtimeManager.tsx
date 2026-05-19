@@ -3,10 +3,31 @@
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function RealtimeManager() {
   const supabase = createClient();
   const router = useRouter();
+  const { subscribeToPushNotifications } = usePushNotifications();
+
+  // ─── Subscrição de Notificações Push ───
+  useEffect(() => {
+    async function initPush() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        // Registar o browser do utilizador para receber push nativo
+        await subscribeToPushNotifications(user.id);
+      } catch (err) {
+        console.error("Erro ao inicializar notificações push:", err);
+      }
+    }
+    
+    // Aguardar 3 segundos para priorizar o carregamento inicial da página
+    const timer = setTimeout(initPush, 3000);
+    return () => clearTimeout(timer);
+  }, [supabase, subscribeToPushNotifications]);
 
   // ─── Atualização de Localização em Segundo Plano ───
   useEffect(() => {
