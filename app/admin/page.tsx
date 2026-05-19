@@ -129,41 +129,44 @@ export default async function AdminDashboard() {
           </a>
         </div>
         <div>
-          {recentUsers?.map((user: any, i: number) => (
-            <div key={user.id} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "14px 24px",
-              borderBottom: i < (recentUsers.length - 1) ? "1px solid #1a2332" : "none"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #4a9eff, #7b68ee)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0
-                }}>
-                  {user.nome?.charAt(0)?.toUpperCase() || "?"}
+          {recentUsers?.map((u: any, i: number) => {
+            if (!u) return null;
+            return (
+              <div key={u.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 24px",
+                borderBottom: i < (recentUsers.length - 1) ? "1px solid #1a2332" : "none"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: "linear-gradient(135deg, #4a9eff, #7b68ee)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0
+                  }}>
+                    {u.nome?.charAt(0)?.toUpperCase() || "?"}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{u.nome || "Sem nome"}</p>
+                    <p style={{ fontSize: 11, color: "#555" }}>{u.cidade || "Sem cidade"}</p>
+                  </div>
                 </div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{user.nome || "Sem nome"}</p>
-                  <p style={{ fontSize: 11, color: "#555" }}>{user.cidade || "Sem cidade"}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
+                    background: u.plano === "premium" ? "rgba(251,191,36,0.15)" : "rgba(100,116,139,0.15)",
+                    color: u.plano === "premium" ? "#fbbf24" : "#64748b",
+                    textTransform: "uppercase", letterSpacing: "0.08em"
+                  }}>
+                    {u.plano}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#555" }}>
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString("pt-PT") : "—"}
+                  </span>
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
-                  background: user.plano === "premium" ? "rgba(251,191,36,0.15)" : "rgba(100,116,139,0.15)",
-                  color: user.plano === "premium" ? "#fbbf24" : "#64748b",
-                  textTransform: "uppercase", letterSpacing: "0.08em"
-                }}>
-                  {user.plano}
-                </span>
-                <span style={{ fontSize: 11, color: "#555" }}>
-                  {user.created_at ? new Date(user.created_at).toLocaleDateString("pt-PT") : "—"}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

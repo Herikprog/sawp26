@@ -222,7 +222,7 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
 
   return (
     <>
-      {email === "bragawork01@gmail.com" && (
+      {email?.toLowerCase() === "bragawork01@gmail.com" && (
         <Link href="/admin" style={adminButtonStyles} title="Painel Admin">
           <Shield size={isMobile ? 16 : 20} />
         </Link>

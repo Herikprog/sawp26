@@ -30,7 +30,7 @@ export default async function AdminLayout({
     // Ignore error
   }
 
-  const isEmailAdmin = user?.email === "bragawork01@gmail.com";
+  const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
 
   if (!isEmailAdmin && !profile?.is_admin) {
     notFound();
@@ -61,19 +61,12 @@ export default async function AdminLayout({
             <a
               key={item.href}
               href={item.href}
+              className="admin-nav-link"
               style={{
                 display: "flex", alignItems: "center", gap: 10,
                 padding: "10px 12px", borderRadius: 10,
                 color: "#a0aec0", textDecoration: "none", fontSize: 13, fontWeight: 500,
                 transition: "all 0.2s",
-              }}
-              onMouseEnter={(e: any) => {
-                e.currentTarget.style.background = "#1a2332";
-                e.currentTarget.style.color = "#fff";
-              }}
-              onMouseLeave={(e: any) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "#a0aec0";
               }}
             >
               <span>{item.icon}</span>
@@ -93,6 +86,12 @@ export default async function AdminLayout({
       <main style={{ flex: 1, overflow: "auto", padding: 32 }}>
         {children}
       </main>
+      <style>{`
+        .admin-nav-link:hover {
+          background: #1a2332 !important;
+          color: #fff !important;
+        }
+      `}</style>
     </div>
   );
 }
