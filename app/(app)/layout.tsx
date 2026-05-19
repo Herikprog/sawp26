@@ -57,8 +57,13 @@ export default async function AppLayout({
           {/* Top spacer for mobile top-nav */}
           <div className="md:hidden" style={{ height: 64 }} />
           {children}
+          {/* Bottom spacer to prevent content from going under mobile bottom nav */}
+          <div className="md:hidden" style={{ height: 88 }} />
         </div>
       </main>
+
+      {/* Mobile bottom nav */}
+      <MobileNav />
     </div>
   );
 }

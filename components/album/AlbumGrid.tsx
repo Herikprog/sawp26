@@ -81,28 +81,11 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
     return Object.keys(categories).filter(cat => cat.toLowerCase().includes(q));
   }, [categories, search]);
 
-  const globalSearchStickers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q || selectedCategory) return [];
-    
-    let list = (stickers || []).filter(s => 
-      s.nome.toLowerCase().includes(q) || 
-      s.codigo.toLowerCase().includes(q) || 
-      (s.selecao && s.selecao.toLowerCase().includes(q))
-    );
-
-    if (activeFilter === "Faltantes") {
-      list = list.filter(s => (stickerMap[s.id] ?? 0) === 0);
-    } else if (activeFilter === "Repetidas") {
-      list = list.filter(s => (stickerMap[s.id] ?? 0) > 1);
+  const filteredStickersToShow = useMemo(() => {
+    let list = stickers || [];
+    if (selectedCategory) {
+      list = categories[selectedCategory] || [];
     }
-
-    return list;
-  }, [stickers, search, selectedCategory, activeFilter, stickerMap]);
-
-  const detailedStickers = useMemo(() => {
-    if (!selectedCategory) return [];
-    let list = categories[selectedCategory] || [];
     
     // Apply status filter
     if (activeFilter === "Faltantes") {
@@ -111,13 +94,15 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
       list = list.filter(s => (stickerMap[s.id] ?? 0) > 1);
     }
     
-    // Apply text search
+    // Apply text search filter
     const q = search.trim().toLowerCase();
     if (!q) return list;
     return list.filter(s => 
-      s.nome.toLowerCase().includes(q) || s.codigo.toLowerCase().includes(q)
+      s.nome.toLowerCase().includes(q) || 
+      s.codigo.toLowerCase().includes(q) ||
+      (s.selecao && s.selecao.toLowerCase().includes(q))
     );
-  }, [categories, selectedCategory, search, activeFilter, stickerMap]);
+  }, [stickers, categories, selectedCategory, search, activeFilter, stickerMap]);
 
   const handleUpdate = (id: string, newQty: number) => {
     setStickerMap(prev => ({ ...prev, [id]: newQty }));
@@ -198,26 +183,24 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
           </div>
 
           {/* Filter Tabs */}
-          {(selectedCategory || search.trim() !== "") && (
-            <div style={{ display: "flex", gap: 6, marginTop: 10, width: "100%", overflowX: "auto", paddingBottom: 2 }}>
-              {["Todas", "Faltantes", "Repetidas"].map(filter => (
-                <button
-                  key={filter}
-                  onClick={() => setActiveFilter(filter as any)}
-                  className="btn-active-scale"
-                  style={{
-                    padding: "8px 16px", borderRadius: 100, fontSize: 11, fontWeight: 700,
-                    background: activeFilter === filter ? "var(--gradient-primary)" : "var(--bg-hover-strong)",
-                    color: activeFilter === filter ? "#fff" : "var(--text-muted)",
-                    border: activeFilter === filter ? "none" : "1px solid var(--border-light)",
-                    cursor: "pointer", transition: "all 0.2s ease", whiteSpace: "nowrap",
-                  }}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-          )}
+          <div style={{ display: "flex", gap: 6, marginTop: 10, width: "100%", overflowX: "auto", paddingBottom: 2 }}>
+            {["Todas", "Faltantes", "Repetidas"].map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter as any)}
+                className="btn-active-scale"
+                style={{
+                  padding: "8px 16px", borderRadius: 100, fontSize: 11, fontWeight: 700,
+                  background: activeFilter === filter ? "var(--gradient-primary)" : "var(--bg-hover-strong)",
+                  color: activeFilter === filter ? "#fff" : "var(--text-muted)",
+                  border: activeFilter === filter ? "none" : "1px solid var(--border-light)",
+                  cursor: "pointer", transition: "all 0.2s ease", whiteSpace: "nowrap",
+                }}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
         </div>
         
         {!readOnly && (
@@ -241,30 +224,7 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
       </div>
 
       <AnimatePresence mode="wait">
-        {!selectedCategory && search.trim() !== "" ? (
-          <motion.div key="global-search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-main)" }}>
-                Resultados para "{search}"
-              </h2>
-              <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
-                {globalSearchStickers.length} figurinhas
-              </span>
-            </div>
-            
-            {globalSearchStickers.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 24 }}>
-                {globalSearchStickers.map(s => (
-                  <StickerCard key={s.id} sticker={s} quantity={stickerMap[s.id] ?? 0} onUpdate={handleUpdate} isEditMode={isEditMode} readOnly={readOnly} />
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: "64px 24px", color: "var(--text-muted)" }}>
-                Nenhuma figurinha ou seleção encontrada para "{search}".
-              </div>
-            )}
-          </motion.div>
-        ) : !selectedCategory ? (
+        {!selectedCategory && activeFilter === "Todas" && search.trim() === "" ? (
           <motion.div key="cat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
             {filteredCategories.map(cat => {
               const stats = categoryStats[cat];
@@ -275,7 +235,7 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
                 <div
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className="dashboard-action-card"
+                  className="dashboard-action-card btn-active-scale"
                   style={{
                     background: "var(--card-bg)", borderRadius: 22, padding: "22px",
                     cursor: "pointer", border: "1px solid var(--border-color)",
@@ -327,9 +287,40 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
           </motion.div>
         ) : (
           <motion.div key="det" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(125px, 1fr))", gap: 18 }}>
-              {detailedStickers.map(s => <StickerCard key={s.id} sticker={s} quantity={stickerMap[s.id] ?? 0} onUpdate={handleUpdate} isEditMode={isEditMode} readOnly={readOnly} />)}
-            </div>
+            {selectedCategory ? (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 10 }}>
+                  {!selectedCategory.toLowerCase().includes("fifa") && !selectedCategory.toLowerCase().includes("coca") && (
+                    <img src={getFlagByCountry(selectedCategory)} alt="" style={{ width: 28, height: 20, borderRadius: 3, objectFit: "cover" }} />
+                  )}
+                  {selectedCategory}
+                </h2>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
+                  {filteredStickersToShow.length} figurinhas
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)" }}>
+                  {activeFilter === "Repetidas" ? "Figurinhas Repetidas" : activeFilter === "Faltantes" ? "Figurinhas Faltantes" : `Resultados para "${search}"`}
+                </h2>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
+                  {filteredStickersToShow.length} figurinhas
+                </span>
+              </div>
+            )}
+            
+            {filteredStickersToShow.length > 0 ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(125px, 1fr))", gap: 18 }}>
+                {filteredStickersToShow.map(s => (
+                  <StickerCard key={s.id} sticker={s} quantity={stickerMap[s.id] ?? 0} onUpdate={handleUpdate} isEditMode={isEditMode} readOnly={readOnly} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "64px 24px", color: "var(--text-muted)", background: "var(--card-bg)", borderRadius: 20, border: "1px dashed var(--border-color)", width: "100%" }}>
+                Nenhuma figurinha encontrada para este filtro.
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
