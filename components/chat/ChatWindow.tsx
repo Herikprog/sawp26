@@ -220,10 +220,6 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         });
         setActiveTradeId(tradeId);
 
-        // Limpar o query param tradeId da URL de forma elegante
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, "", newUrl);
-
         // Notificar o outro colecionador via broadcast, com retry até o canal estar pronto
         broadcastWhenReady({
           userId: myUserId,
@@ -292,6 +288,13 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             // BUG2 FIX: troca concluída pelo outro lado — fechar painel e actualizar inventário
             if (completed === true) {
               toast.success("🏆 Troca concluída com sucesso!");
+
+              // Limpar o query param tradeId da URL ao finalizar
+              if (typeof window !== "undefined") {
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, "", newUrl);
+              }
+
               // loadInventory fora do setState para não violar regras de hooks
               setTimeout(() => loadInventory(), 0);
               return {
@@ -315,6 +318,13 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 return prev;
               }
               toast.error("O outro colecionador cancelou a negociação de trocas.");
+
+              // Limpar o query param tradeId da URL ao cancelar
+              if (typeof window !== "undefined") {
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, "", newUrl);
+              }
+
               nextSession.isActive = false;
               nextSession.myOffers = [];
               nextSession.otherOffers = [];
@@ -468,6 +478,12 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     if (activeTradeId) {
       supabase.from("trades").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", activeTradeId).then();
       setActiveTradeId(null);
+    }
+
+    // Limpar o query param tradeId da URL ao fechar localmente
+    if (typeof window !== "undefined") {
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
     }
 
     if (channelRef.current) {
@@ -695,6 +711,12 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     } else {
       if (activeTradeId) {
         await supabase.from("trades").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", activeTradeId);
+      }
+
+      // Limpar o query param tradeId da URL ao finalizar com sucesso
+      if (typeof window !== "undefined") {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
       }
 
       toast.success("🏆 Troca realizada e álbuns atualizados com sucesso!");
