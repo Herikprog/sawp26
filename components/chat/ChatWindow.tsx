@@ -824,7 +824,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               position: "absolute", top: isMobile ? 68 : 77, left: 0, right: 0, bottom: 0,
               background: "rgba(7, 17, 31, 0.98)", backdropFilter: "blur(20px)",
               zIndex: 50, padding: isMobile ? 12 : 24, display: "flex", flexDirection: "column",
-              borderTop: "1px solid rgba(255, 255, 255, 0.05)"
+              borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+              overscrollBehavior: "none", touchAction: "pan-x pan-y"
             }}
           >
             {/* Header da modal */}
@@ -866,6 +867,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               gap: isMobile ? 12 : 20,
               flex: 1,
               overflowY: "auto",
+              overscrollBehavior: "contain",
               marginBottom: 16
             }}>
               
