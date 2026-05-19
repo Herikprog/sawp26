@@ -82,6 +82,14 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   // Supabase instanciado uma vez — sem leaks de WebSocket por re-render
   const supabase = useMemo(() => createClient(), []);
 
+  const tradeOpenedAt = useRef<number>(0);
+
+  useEffect(() => {
+    if (tradeSession.isActive) {
+      tradeOpenedAt.current = Date.now();
+    }
+  }, [tradeSession.isActive]);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     isScrolledToBottom.current = scrollHeight - scrollTop - clientHeight < 50;
@@ -276,7 +284,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         }
       })
       .on("broadcast", { event: "trade_sync" }, (payload: any) => {
-        const { userId, offers, accepted, isActive, completed } = payload.payload;
+        const { userId, myOffers, myAccepted, isActive, completed } = payload.payload;
         if (userId !== myUserId) {
           setTradeSession((prev) => {
             // BUG2 FIX: troca concluída pelo outro lado — fechar painel e actualizar inventário
@@ -293,12 +301,17 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             const nextSession = {
               ...prev,
               isActive: prev.isActive || isActive,
-              otherOffers: offers ?? prev.otherOffers,
-              otherAccepted: accepted ?? prev.otherAccepted,
+              otherOffers: myOffers ?? prev.otherOffers,
+              otherAccepted: myAccepted ?? prev.otherAccepted,
             };
 
             // Se o outro utilizador cancelar
             if (isActive === false && prev.isActive) {
+              // Ignorar broadcasts de fecho que chegam nos primeiros 2 segundos após abertura
+              // (são ecos de sessões anteriores)
+              if (Date.now() - tradeOpenedAt.current < 2000) {
+                return prev;
+              }
               toast.error("O outro colecionador cancelou a negociação de trocas.");
               nextSession.isActive = false;
               nextSession.myOffers = [];

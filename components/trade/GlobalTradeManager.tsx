@@ -196,18 +196,25 @@ export default function GlobalTradeManager() {
           if (!tradeRow) return;
 
           if (tradeRow.status === "accepted") {
+            // Capturar os valores ANTES de limpar o estado
+            const receiverId = outgoingCall.receiver_id;
+            const tradeId = outgoingCall.id;
+            const myId = currentUser?.id;
+
+            // Limpar PRIMEIRO para não haver re-subscribe do useEffect
+            setOutgoingCall(null);
+            setReceiverProfile(null);
+
             toast.success("🏆 Chamada de troca aceite! A entrar no painel de negociação...");
 
             supabase
               .from("conversations")
               .select("id")
-              .or(`and(user_a_id.eq.${currentUser?.id},user_b_id.eq.${outgoingCall.receiver_id}),and(user_a_id.eq.${outgoingCall.receiver_id},user_b_id.eq.${currentUser?.id})`)
+              .or(`and(user_a_id.eq.${myId},user_b_id.eq.${receiverId}),and(user_a_id.eq.${receiverId},user_b_id.eq.${myId})`)
               .maybeSingle()
               .then(({ data: conv }: any) => {
-                setOutgoingCall(null);
-                setReceiverProfile(null);
                 if (conv) {
-                  window.location.href = `/chat/${conv.id}?tradeId=${outgoingCall.id}`;
+                  window.location.href = `/chat/${conv.id}?tradeId=${tradeId}`;
                 }
               });
           } else if (tradeRow.status === "completed") {
