@@ -69,10 +69,40 @@ export async function POST(request: Request) {
     } 
     // ─── 2. CASO: Nova notificação global do sistema ───
     else if (table === "social_notifications") {
-      const { user_id, title, content } = record;
+      const { user_id, actor_id, type } = record;
       recipientId = user_id;
-      pushTitle = title || "Swap26";
-      pushBody = content || "Tem um novo alerta.";
+
+      // Buscar o nome de quem realizou a ação (actor)
+      const { data: actor } = await supabaseAdmin
+        .from("profiles")
+        .select("nome")
+        .eq("id", actor_id)
+        .single();
+
+      const actorName = actor?.nome ? actor.nome : "Alguém";
+
+      pushTitle = "Swap26";
+      
+      switch (type) {
+        case "like":
+          pushBody = `${actorName} gostou do teu post!`;
+          break;
+        case "reply":
+          pushBody = `${actorName} comentou no teu post!`;
+          break;
+        case "follow":
+          pushBody = `${actorName} começou a seguir-te!`;
+          break;
+        case "trade":
+          pushBody = `${actorName} propôs-te uma troca de figurinhas!`;
+          break;
+        case "repost":
+          pushBody = `${actorName} partilhou o teu post!`;
+          break;
+        default:
+          pushBody = "Tem uma nova atualização na sua conta!";
+      }
+
       pushUrl = "/feed";
     } 
     // Outras tabelas não suportadas
