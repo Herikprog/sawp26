@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Heart, MessageSquare, Repeat2, UserPlus, CheckCheck, X } from "lucide-react";
+import { Bell, Heart, MessageSquare, Repeat2, UserPlus, CheckCheck, X, Shield } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -17,7 +17,15 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
   const [loading, setLoading] = useState(false);
   
   const supabase = createClient();
+  const [email, setEmail] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then((res: any) => {
+      const u = res?.data?.user;
+      if (u?.email) setEmail(u.email);
+    });
+  }, []);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -191,8 +199,35 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
       };
 
+  const adminButtonStyles: React.CSSProperties = isMobile
+    ? {
+        background: "rgba(239, 68, 68, 0.12)",
+        border: "1px solid rgba(239, 68, 68, 0.25)",
+        color: "#f87171",
+        width: 36, height: 36, borderRadius: 10,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", textDecoration: "none",
+        transition: "all 0.2s ease"
+      }
+    : {
+        position: "fixed", top: 14, right: 70, zIndex: 100,
+        width: 44, height: 44, borderRadius: 14,
+        background: "rgba(239, 68, 68, 0.12)", backdropFilter: "blur(12px)",
+        border: "1px solid rgba(239, 68, 68, 0.25)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#f87171", cursor: "pointer", textDecoration: "none",
+        boxShadow: "0 8px 32px rgba(239, 68, 68, 0.1)",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+      };
+
   return (
-    <div ref={dropdownRef} style={{ position: isMobile ? "relative" : "static" }}>
+    <>
+      {email === "bragawork01@gmail.com" && (
+        <Link href="/admin" style={adminButtonStyles} title="Painel Admin">
+          <Shield size={isMobile ? 16 : 20} />
+        </Link>
+      )}
+      <div ref={dropdownRef} style={{ position: isMobile ? "relative" : "static" }}>
       {/* 🔔 BOTÃO DO SININHO */}
       <button 
         onClick={() => setIsOpen(!isOpen)} 
@@ -373,5 +408,6 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
         }
       `}</style>
     </div>
+    </>
   );
 }
