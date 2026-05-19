@@ -17,17 +17,20 @@ CREATE INDEX IF NOT EXISTS idx_messages_unread
 ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
 
 -- Apenas iniciador ou receptor podem ver a sua troca
-CREATE POLICY IF NOT EXISTS "trades_select_participant"
+DROP POLICY IF EXISTS "trades_select_participant" ON trades;
+CREATE POLICY "trades_select_participant"
   ON trades FOR SELECT
   USING (auth.uid() IN (initiator_id, receiver_id));
 
 -- Só o iniciador pode criar uma troca
-CREATE POLICY IF NOT EXISTS "trades_insert_initiator"
+DROP POLICY IF EXISTS "trades_insert_initiator" ON trades;
+CREATE POLICY "trades_insert_initiator"
   ON trades FOR INSERT
   WITH CHECK (auth.uid() = initiator_id);
 
 -- Só o receptor ou o iniciador podem actualizar (aceitar/rejeitar/cancelar)
-CREATE POLICY IF NOT EXISTS "trades_update_participant"
+DROP POLICY IF EXISTS "trades_update_participant" ON trades;
+CREATE POLICY "trades_update_participant"
   ON trades FOR UPDATE
   USING (auth.uid() IN (initiator_id, receiver_id));
 
@@ -35,7 +38,8 @@ CREATE POLICY IF NOT EXISTS "trades_update_participant"
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
 -- Só participantes da conversa podem ler mensagens
-CREATE POLICY IF NOT EXISTS "messages_select_participant"
+DROP POLICY IF EXISTS "messages_select_participant" ON messages;
+CREATE POLICY "messages_select_participant"
   ON messages FOR SELECT
   USING (
     EXISTS (
@@ -46,7 +50,8 @@ CREATE POLICY IF NOT EXISTS "messages_select_participant"
   );
 
 -- Só o remetente pode inserir mensagens
-CREATE POLICY IF NOT EXISTS "messages_insert_sender"
+DROP POLICY IF EXISTS "messages_insert_sender" ON messages;
+CREATE POLICY "messages_insert_sender"
   ON messages FOR INSERT
   WITH CHECK (
     auth.uid() = sender_id
@@ -58,7 +63,8 @@ CREATE POLICY IF NOT EXISTS "messages_insert_sender"
   );
 
 -- Qualquer participante da conversa pode marcar como lido
-CREATE POLICY IF NOT EXISTS "messages_update_read"
+DROP POLICY IF EXISTS "messages_update_read" ON messages;
+CREATE POLICY "messages_update_read"
   ON messages FOR UPDATE
   USING (
     EXISTS (
