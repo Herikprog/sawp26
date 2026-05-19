@@ -16,6 +16,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // Guard: impedir conversa do utilizador consigo próprio
+  if (targetUserId === user.id) {
+    return NextResponse.redirect(new URL("/chat", request.url));
+  }
+
   // Check if conversation already exists
   const { data: existingConvs } = await supabase
     .from("conversations")

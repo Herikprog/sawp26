@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Message, Profile } from "@/types";
 import { timeAgo } from "@/lib/utils";
@@ -75,7 +75,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const receiverTypingTimeout = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
-  const supabase = createClient();
+  // Ref para evitar markAsRead repetido quando não há novas mensagens do outro
+  const hasMarkedRef = useRef(false);
+  // Supabase instanciado uma vez — sem leaks de WebSocket por re-render
+  const supabase = useMemo(() => createClient(), []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -209,21 +212,13 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         const newUrl = window.location.pathname;
         window.history.replaceState({}, "", newUrl);
 
-        // Notificar o outro colecionador via broadcast para carregar e abrir na tela dele também!
-        setTimeout(() => {
-          if (channelRef.current) {
-            channelRef.current.send({
-              type: "broadcast",
-              event: "trade_sync",
-              payload: {
-                userId: myUserId,
-                offers: myOffers,
-                accepted: false,
-                isActive: true
-              }
-            });
-          }
-        }, 1200);
+        // Notificar o outro colecionador via broadcast, com retry até o canal estar pronto
+        broadcastWhenReady({
+          userId: myUserId,
+          offers: myOffers,
+          accepted: false,
+          isActive: true
+        });
 
       } catch (err) {
         console.error("Failed to load prefilled trade proposal:", err);
@@ -279,9 +274,20 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         }
       })
       .on("broadcast", { event: "trade_sync" }, (payload: any) => {
-        const { userId, offers, accepted, isActive } = payload.payload;
+        const { userId, offers, accepted, isActive, completed } = payload.payload;
         if (userId !== myUserId) {
           setTradeSession((prev) => {
+            // BUG2 FIX: troca concluída pelo outro lado — fechar painel e actualizar inventário
+            if (completed === true) {
+              toast.success("🏆 Troca concluída com sucesso!");
+              // loadInventory fora do setState para não violar regras de hooks
+              setTimeout(() => loadInventory(), 0);
+              return {
+                isActive: false, myOffers: [], otherOffers: [],
+                myAccepted: false, otherAccepted: false, errorMessage: "", isExecuting: false
+              };
+            }
+
             const nextSession = {
               ...prev,
               isActive: prev.isActive || isActive,
@@ -289,7 +295,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               otherAccepted: accepted ?? prev.otherAccepted,
             };
 
-            // Se o outro utilizador fechar a modal de trocas
+            // Se o outro utilizador cancelar
             if (isActive === false && prev.isActive) {
               toast.error("O outro colecionador cancelou a negociação de trocas.");
               nextSession.isActive = false;
@@ -320,20 +326,24 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     };
   }, [conversationId, myUserId, supabase]);
 
-  // Marcar como lido
+  // Marcar como lido — só corre quando chegam mensagens novas do outro utilizador
+  // hasMarkedRef evita UPDATE redundante a cada render (inclui próprias mensagens)
   useEffect(() => {
-    async function markAsRead() {
-      const hasUnread = messages.some(m => !m.read && m.sender_id !== myUserId);
-      if (hasUnread) {
-        await supabase
-          .from("messages")
-          .update({ read: true })
-          .eq("conversation_id", conversationId)
-          .not("sender_id", "eq", myUserId)
-          .eq("read", false);
-      }
+    const hasNewUnread = messages.some(m => !m.read && m.sender_id !== myUserId);
+    if (!hasNewUnread) {
+      // Sem mensagens por ler — reset da flag para a próxima vez
+      hasMarkedRef.current = false;
+      return;
     }
-    markAsRead();
+    if (hasMarkedRef.current) return; // Já marcou esta série de mensagens
+    hasMarkedRef.current = true;
+
+    void supabase
+      .from("messages")
+      .update({ read: true })
+      .eq("conversation_id", conversationId)
+      .not("sender_id", "eq", myUserId)
+      .eq("read", false);
   }, [messages, conversationId, myUserId, supabase]);
 
   // Digitação
@@ -454,6 +464,15 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           isActive: true
         }
       });
+    }
+  }
+
+  // Broadcast com retry — espera o canal WebSocket estar pronto (evita perda no mount)
+  function broadcastWhenReady(payload: object, retries = 15, delayMs = 300) {
+    if (channelRef.current) {
+      channelRef.current.send({ type: "broadcast", event: "trade_sync", payload });
+    } else if (retries > 0) {
+      setTimeout(() => broadcastWhenReady(payload, retries - 1, delayMs), delayMs);
     }
   }
 
@@ -604,16 +623,22 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
   async function toggleAccept() {
     const nextAccept = !tradeSession.myAccepted;
-    
+
     setTradeSession(prev => {
       const next = { ...prev, myAccepted: nextAccept, errorMessage: "" };
       broadcastOffers(prev.myOffers, nextAccept);
       return next;
     });
 
-    // Se ambos aceitaram, podemos rodar o fechamento imediato da transação!
+    // BUG1 FIX: Race condition — só o utilizador com o ID lexicograficamente menor
+    // executa a troca. O outro aguarda o broadcast "completed" para fechar o painel.
+    // Isto garante execução única mesmo que ambos aceitem em simultâneo.
     if (nextAccept && tradeSession.otherAccepted) {
-      await executeStickerExchange();
+      const iAmExecutor = myUserId < otherUser.id;
+      if (iAmExecutor) {
+        await executeStickerExchange();
+      }
+      // Se não sou o executor, fico à espera do broadcast "completed" do outro lado
     }
   }
 
@@ -647,19 +672,21 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       toast.error("Falha ao concluir troca. Verifique o alerta no painel.");
     } else {
       toast.success("🏆 Troca realizada e álbuns atualizados com sucesso!");
-      
-      // Fechar painel de troca e zerar os buffers
+
+      // BUG2 FIX: Notificar o outro lado para fechar o painel (ele não executa, só aguarda)
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "trade_sync",
+          payload: { userId: myUserId, isActive: false, completed: true }
+        });
+      }
+
       setTradeSession({
-        isActive: false,
-        myOffers: [],
-        otherOffers: [],
-        myAccepted: false,
-        otherAccepted: false,
-        errorMessage: "",
-        isExecuting: false
+        isActive: false, myOffers: [], otherOffers: [],
+        myAccepted: false, otherAccepted: false, errorMessage: "", isExecuting: false
       });
 
-      // Atualizar o inventário local em background
       loadInventory();
     }
   }
@@ -1044,7 +1071,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       {/* Área de Mensagens do Chat */}
       <div 
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px 12px" : "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}
+        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: isMobile ? "16px 12px" : "32px 24px", display: "flex", flexDirection: "column", gap: 16 }}
       >
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", marginTop: "20%" }}>
@@ -1098,6 +1125,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 style={{
                   alignSelf: isMe ? "flex-end" : "flex-start",
                   maxWidth: isMobile ? "85%" : "70%",
+                  width: "fit-content",
+                  minWidth: 0,
                   display: "flex", flexDirection: "column",
                   alignItems: isMe ? "flex-end" : "flex-start"
                 }}
@@ -1109,6 +1138,9 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                   color: "var(--text-main)",
                   fontSize: 15,
                   lineHeight: 1.5,
+                  wordBreak: "break-word",
+                  overflowWrap: "break-word",
+                  minWidth: 0,
                   boxShadow: isMe ? "0 4px 15px rgba(0,174,239,0.2)" : "0 4px 15px rgba(0,0,0,0.1)",
                   border: isMe ? "none" : "1px solid rgba(255,255,255,0.05)"
                 }}>

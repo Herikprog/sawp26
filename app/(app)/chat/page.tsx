@@ -21,12 +21,16 @@ export default async function ChatListPage() {
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
     .order("last_msg_at", { ascending: false, nullsFirst: false });
 
-  // Fetch unread counts for all conversations
-  const { data: unreadMessages } = await supabase
-    .from("messages")
-    .select("conversation_id")
-    .eq("read", false)
-    .not("sender_id", "eq", user.id);
+  // Fetch unread counts — filtrado pelas conversas do utilizador (evita vazamento de dados)
+  const conversationIds = conversations?.map(c => c.id) ?? [];
+  const { data: unreadMessages } = conversationIds.length > 0
+    ? await supabase
+        .from("messages")
+        .select("conversation_id")
+        .eq("read", false)
+        .not("sender_id", "eq", user.id)
+        .in("conversation_id", conversationIds)
+    : { data: [] };
 
   const unreadCounts: Record<string, number> = {};
   unreadMessages?.forEach(m => {

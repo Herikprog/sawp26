@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Phone, 
-  PhoneCall, 
-  PhoneOff, 
-  Check, 
-  X, 
-  Repeat2, 
-  Sparkles, 
-  CheckCircle2, 
+  PhoneCall,
+  PhoneOff,
   Loader2 
 } from "lucide-react";
 import Image from "next/image";
@@ -19,62 +13,58 @@ import toast from "react-hot-toast";
 import { getFlagUrl } from "@/types";
 
 // ============================================================
-// SINTETIZADOR WEB AUDIO API PARA TOQUE PREMIUM SEM DEPENDÊNCIAS
+// SINTETIZADOR WEB AUDIO API — audioCtx e ringInterval em useRef
+// (evita leaks entre desmontagens/hot reload)
 // ============================================================
-let audioCtx: AudioContext | null = null;
-let ringInterval: any = null;
-
-function startRingingSound() {
+function startRingingSound(
+  audioCtxRef: React.MutableRefObject<AudioContext | null>,
+  ringIntervalRef: React.MutableRefObject<any>
+) {
   if (typeof window === "undefined") return;
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    audioCtx = new AudioContextClass();
-    
+    audioCtxRef.current = new AudioContextClass();
+
     const playFuturisticChime = () => {
-      const ctx = audioCtx;
+      const ctx = audioCtxRef.current;
       if (!ctx || ctx.state === "suspended") return;
       const now = ctx.currentTime;
-      
-      // Frequências para acorde futurista suave e harmonioso
-      const freqs = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-      
+      const freqs = [523.25, 659.25, 783.99, 1046.50];
       freqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
-        
-        osc.type = "sine";
-        // Pequeno atraso cascata para efeito harpa
         const noteDelay = idx * 0.08;
+        osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + noteDelay);
         osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + noteDelay + 0.6);
-        
         gainNode.gain.setValueAtTime(0, now + noteDelay);
         gainNode.gain.linearRampToValueAtTime(0.12, now + noteDelay + 0.05);
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + noteDelay + 0.8);
-        
         osc.connect(gainNode);
         gainNode.connect(ctx.destination);
-        
         osc.start(now + noteDelay);
         osc.stop(now + noteDelay + 0.9);
       });
     };
-    
+
     playFuturisticChime();
-    ringInterval = setInterval(playFuturisticChime, 1800);
+    ringIntervalRef.current = setInterval(playFuturisticChime, 1800);
   } catch (e) {
     console.error("Audio Context Ringing Error:", e);
   }
 }
 
-function stopRingingSound() {
-  if (ringInterval) {
-    clearInterval(ringInterval);
-    ringInterval = null;
+function stopRingingSound(
+  audioCtxRef: React.MutableRefObject<AudioContext | null>,
+  ringIntervalRef: React.MutableRefObject<any>
+) {
+  if (ringIntervalRef.current) {
+    clearInterval(ringIntervalRef.current);
+    ringIntervalRef.current = null;
   }
-  if (audioCtx) {
-    audioCtx.close().catch(() => {});
-    audioCtx = null;
+  if (audioCtxRef.current) {
+    audioCtxRef.current.close().catch(() => {});
+    audioCtxRef.current = null;
   }
 }
 
@@ -86,24 +76,31 @@ export default function GlobalTradeManager() {
   const [initiatorProfile, setInitiatorProfile] = useState<any>(null);
   const [receiverProfile, setReceiverProfile] = useState<any>(null);
   const [stickersMap, setStickersMap] = useState<Record<number, string>>({});
-  
-  const supabase = createClient();
-  const outgoingSubscription = useRef<any>(null);
+
+  // AudioContext e ringInterval em useRef — limpos correctamente no cleanup
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ringIntervalRef = useRef<any>(null);
+
+  // Supabase instanciado uma vez com useMemo — sem leaks de WebSocket
+  const supabase = useMemo(() => createClient(), []);
+
+  // Cleanup garantido na desmontagem (hot reload, navigation)
+  useEffect(() => {
+    return () => {
+      stopRingingSound(audioCtxRef, ringIntervalRef);
+    };
+  }, []);
 
   // 1. Carregar utilizador logado e catálogo de figurinhas
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUser(user);
-      }
+      if (user) setCurrentUser(user);
 
       const { data: stickersData } = await supabase.from("stickers").select("id, codigo");
       if (stickersData) {
         const dict: Record<number, string> = {};
-        stickersData.forEach((s: any) => {
-          dict[s.id] = s.codigo;
-        });
+        stickersData.forEach((s: any) => { dict[s.id] = s.codigo; });
         setStickersMap(dict);
       }
     }
@@ -114,19 +111,15 @@ export default function GlobalTradeManager() {
   useEffect(() => {
     if (!currentUser) return;
 
-    // Função para carregar perfil do remetente da chamada
     async function fetchInitiatorProfile(initiatorId: string) {
       const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", initiatorId)
         .single();
-      if (data) {
-        setInitiatorProfile(data);
-      }
+      if (data) setInitiatorProfile(data);
     }
 
-    // Criar canal em tempo real para ouvir inserts na tabela trades
     const channel = supabase.channel("incoming-trades")
       .on(
         "postgres_changes",
@@ -141,7 +134,7 @@ export default function GlobalTradeManager() {
           if (tradeRow && tradeRow.status === "pending") {
             setIncomingCall(tradeRow);
             await fetchInitiatorProfile(tradeRow.initiator_id);
-            startRingingSound();
+            startRingingSound(audioCtxRef, ringIntervalRef);
           }
         }
       )
@@ -153,15 +146,12 @@ export default function GlobalTradeManager() {
           table: "trades",
           filter: `receiver_id=eq.${currentUser.id}`
         },
-        async (payload: any) => {
+        (payload: any) => {
           const tradeRow = payload.new;
-          if (tradeRow) {
-            if (tradeRow.status !== "pending") {
-              // Se foi cancelado ou fechado pelo outro lado
-              setIncomingCall(null);
-              setInitiatorProfile(null);
-              stopRingingSound();
-            }
+          if (tradeRow && tradeRow.status !== "pending") {
+            setIncomingCall(null);
+            setInitiatorProfile(null);
+            stopRingingSound(audioCtxRef, ringIntervalRef);
           }
         }
       )
@@ -169,28 +159,25 @@ export default function GlobalTradeManager() {
 
     return () => {
       supabase.removeChannel(channel);
-      stopRingingSound();
+      stopRingingSound(audioCtxRef, ringIntervalRef);
     };
   }, [currentUser, supabase]);
 
   // 3a. Carregar perfil do destinatário da chamada enviada
   useEffect(() => {
     if (!outgoingCall) return;
-
     async function fetchReceiverProfile(receiverId: string) {
       const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", receiverId)
         .single();
-      if (data) {
-        setReceiverProfile(data);
-      }
+      if (data) setReceiverProfile(data);
     }
     fetchReceiverProfile(outgoingCall.receiver_id);
   }, [outgoingCall, supabase]);
 
-  // 3b. Ouvir atualizações em tempo real da chamada enviada (sem race conditions)
+  // 3b. Ouvir actualizações da chamada enviada — COM FILTRO por trade ID
   useEffect(() => {
     if (!outgoingCall) return;
 
@@ -200,39 +187,40 @@ export default function GlobalTradeManager() {
         {
           event: "UPDATE",
           schema: "public",
-          table: "trades"
+          table: "trades",
+          // CORRECÇÃO: filtro por ID concreto — evita receber updates de outras trocas
+          filter: `id=eq.${outgoingCall.id}`
         },
         (payload: any) => {
           const tradeRow = payload.new;
-          if (tradeRow && tradeRow.id === outgoingCall.id) {
-            if (tradeRow.status === "accepted") {
-              toast.success("🏆 Chamada de troca aceite! A entrar no painel de negociação...");
-              
-              supabase
-                .from("conversations")
-                .select("id")
-                .or(`and(user_a_id.eq.${currentUser?.id},user_b_id.eq.${outgoingCall.receiver_id}),and(user_a_id.eq.${outgoingCall.receiver_id},user_b_id.eq.${currentUser?.id})`)
-                .maybeSingle()
-                .then(({ data: conv }: any) => {
-                  if (conv) {
-                    window.location.href = `/chat/${conv.id}?tradeId=${outgoingCall.id}`;
-                  }
-                });
+          if (!tradeRow) return;
 
-              setOutgoingCall(null);
-              setReceiverProfile(null);
-            } else if (tradeRow.status === "completed") {
-              toast.success("🏆 A sua troca foi concluída com sucesso!");
-              setOutgoingCall(null);
-              setReceiverProfile(null);
-            } else if (tradeRow.status === "rejected") {
-              toast.error(`❌ A sua proposta de troca foi recusada.`);
-              setOutgoingCall(null);
-              setReceiverProfile(null);
-            } else if (tradeRow.status === "cancelled") {
-              setOutgoingCall(null);
-              setReceiverProfile(null);
-            }
+          if (tradeRow.status === "accepted") {
+            toast.success("🏆 Chamada de troca aceite! A entrar no painel de negociação...");
+
+            supabase
+              .from("conversations")
+              .select("id")
+              .or(`and(user_a_id.eq.${currentUser?.id},user_b_id.eq.${outgoingCall.receiver_id}),and(user_a_id.eq.${outgoingCall.receiver_id},user_b_id.eq.${currentUser?.id})`)
+              .maybeSingle()
+              .then(({ data: conv }: any) => {
+                setOutgoingCall(null);
+                setReceiverProfile(null);
+                if (conv) {
+                  window.location.href = `/chat/${conv.id}?tradeId=${outgoingCall.id}`;
+                }
+              });
+          } else if (tradeRow.status === "completed") {
+            toast.success("🏆 A sua troca foi concluída com sucesso!");
+            setOutgoingCall(null);
+            setReceiverProfile(null);
+          } else if (tradeRow.status === "rejected") {
+            toast.error("❌ A sua proposta de troca foi recusada.");
+            setOutgoingCall(null);
+            setReceiverProfile(null);
+          } else if (tradeRow.status === "cancelled") {
+            setOutgoingCall(null);
+            setReceiverProfile(null);
           }
         }
       )
@@ -241,27 +229,24 @@ export default function GlobalTradeManager() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [outgoingCall, supabase]);
+  }, [outgoingCall, currentUser, supabase]);
 
-  // 4. Ouvir propostas que nós criamos via evento do window (integração flexível com ChatWindow)
+  // 4. Ouvir propostas criadas via evento do window (integração com ChatWindow)
   useEffect(() => {
     function handleTriggerOutgoing(event: CustomEvent) {
-      if (event.detail && event.detail.trade) {
-        setOutgoingCall(event.detail.trade);
-      }
+      if (event.detail?.trade) setOutgoingCall(event.detail.trade);
     }
     window.addEventListener("trigger_outgoing_trade" as any, handleTriggerOutgoing);
     return () => window.removeEventListener("trigger_outgoing_trade" as any, handleTriggerOutgoing);
   }, []);
 
-  // Aceitar Troca Recebida
+  // ACEITAR Troca Recebida — estado limpo ANTES do redirect (sem estado fantasma)
   async function handleAccept() {
     if (!incomingCall || !currentUser) return;
     setLoading(true);
-    stopRingingSound();
+    stopRingingSound(audioCtxRef, ringIntervalRef);
 
     try {
-      // A. Obter ou criar conversa entre os dois utilizadores para logar o recibo no chat
       let { data: conv } = await supabase
         .from("conversations")
         .select("id")
@@ -269,7 +254,6 @@ export default function GlobalTradeManager() {
         .maybeSingle();
 
       if (!conv) {
-        // Criar conversa caso não exista
         const { data: newConv, error: newConvErr } = await supabase
           .from("conversations")
           .insert({
@@ -280,37 +264,38 @@ export default function GlobalTradeManager() {
           })
           .select("id")
           .single();
-        
         if (newConvErr) throw newConvErr;
         conv = newConv;
       }
 
-      // B. Atualizar status da chamada para aceita (accepted) no banco de dados
       await supabase
         .from("trades")
         .update({ status: "accepted", updated_at: new Date().toISOString() })
         .eq("id", incomingCall.id);
 
-      toast.success("🏆 Chamada de troca aceita! A entrar no painel de negociação...");
+      // CORRECÇÃO: limpar estado ANTES do redirect — sem finally que corre depois
+      const targetUrl = `/chat/${conv.id}?tradeId=${incomingCall.id}`;
+      setIncomingCall(null);
+      setInitiatorProfile(null);
+      setLoading(false);
 
-      // C. Redirecionar para o chat com o tradeId
-      window.location.href = `/chat/${conv.id}?tradeId=${incomingCall.id}`;
+      toast.success("Chamada aceite! A entrar...");
+      window.location.href = targetUrl;
+
     } catch (err: any) {
       console.error("Failed to accept trade invitation:", err);
       toast.error(`Falha ao aceitar chamada: ${err.message || "Erro desconhecido"}`);
-    } finally {
       setLoading(false);
-      setIncomingCall(null);
-      setInitiatorProfile(null);
+      // Em caso de erro, manter o overlay para o utilizador tentar de novo
     }
+    // SEM finally — o setLoading(false) já está nos dois ramos (sucesso e erro)
   }
 
   // Recusar Troca Recebida
   async function handleDecline() {
     if (!incomingCall) return;
     setLoading(true);
-    stopRingingSound();
-
+    stopRingingSound(audioCtxRef, ringIntervalRef);
     try {
       await supabase
         .from("trades")
@@ -330,7 +315,6 @@ export default function GlobalTradeManager() {
   async function handleCancelOutgoing() {
     if (!outgoingCall) return;
     setLoading(true);
-
     try {
       await supabase
         .from("trades")
@@ -348,7 +332,7 @@ export default function GlobalTradeManager() {
 
   return (
     <>
-      {/* 🟢 OVERLAY DE CHAMADA RECEBIDA (INCOMING CALL) */}
+      {/* 🟢 OVERLAY DE CHAMADA RECEBIDA */}
       <AnimatePresence>
         {incomingCall && initiatorProfile && (
           <div style={{
@@ -369,7 +353,6 @@ export default function GlobalTradeManager() {
                 overflow: "hidden"
               }}
             >
-              {/* Efeito Neon Gold de Fundo */}
               <div style={{
                 position: "absolute", top: -100, left: "50%", transform: "translateX(-50%)",
                 width: 250, height: 250, borderRadius: "50%",
@@ -377,12 +360,9 @@ export default function GlobalTradeManager() {
                 pointerEvents: "none"
               }} />
 
-              {/* Anel Pulsante Dourado e Avatar */}
               <div style={{ position: "relative", width: 100, height: 100, margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {/* Ripples */}
                 <div className="call-ripple-1" style={{ position: "absolute", inset: -10, borderRadius: "50%", border: "2px solid rgba(245, 183, 0, 0.3)", opacity: 0.6 }} />
                 <div className="call-ripple-2" style={{ position: "absolute", inset: -22, borderRadius: "50%", border: "1px solid rgba(245, 183, 0, 0.15)", opacity: 0.4 }} />
-                
                 <div style={{
                   width: 90, height: 90, borderRadius: 28, overflow: "hidden",
                   border: "3px solid var(--warning)", boxShadow: "0 0 25px rgba(245, 183, 0, 0.4)",
@@ -396,7 +376,6 @@ export default function GlobalTradeManager() {
                 </div>
               </div>
 
-              {/* Título de Chamada */}
               <span style={{ fontSize: 11, fontWeight: 900, color: "var(--warning)", textTransform: "uppercase", letterSpacing: "0.2em" }}>
                 🚨 CHAMADA DE TROCA RECEBIDA 🚨
               </span>
@@ -407,9 +386,7 @@ export default function GlobalTradeManager() {
                 Está a propor uma troca de figurinhas em tempo real!
               </p>
 
-              {/* Detalhes da Proposta de Troca */}
               <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 24, padding: "18px 20px", marginBottom: 28, textAlign: "left" }}>
-                {/* Ele Oferece */}
                 <div style={{ marginBottom: 14 }}>
                   <span style={{ fontSize: 10, fontWeight: 800, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Ele te oferece:</span>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
@@ -417,15 +394,13 @@ export default function GlobalTradeManager() {
                       const code = stickersMap[id] || `Fig. ${id}`;
                       return (
                         <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(46,204,113,0.1)", border: "1px solid rgba(46,204,113,0.2)", borderRadius: 8, padding: "3px 6px", fontSize: 10, fontWeight: 700, color: "#2ecc71" }}>
-                          <img src={getFlagUrl(code)} style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
+                          <img src={getFlagUrl(code)} alt="" style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
                           {code}
                         </span>
                       );
                     })}
                   </div>
                 </div>
-
-                {/* Ele Pede */}
                 <div>
                   <span style={{ fontSize: 10, fontWeight: 800, color: "var(--warning)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Ele quer de ti:</span>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
@@ -433,7 +408,7 @@ export default function GlobalTradeManager() {
                       const code = stickersMap[id] || `Fig. ${id}`;
                       return (
                         <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(245,183,0,0.1)", border: "1px solid rgba(245,183,0,0.2)", borderRadius: 8, padding: "3px 6px", fontSize: 10, fontWeight: 700, color: "var(--warning)" }}>
-                          <img src={getFlagUrl(code)} style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
+                          <img src={getFlagUrl(code)} alt="" style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
                           {code}
                         </span>
                       );
@@ -442,7 +417,6 @@ export default function GlobalTradeManager() {
                 </div>
               </div>
 
-              {/* Botões de Decisão */}
               <div style={{ display: "flex", gap: 14 }}>
                 <button
                   onClick={handleDecline}
@@ -456,7 +430,6 @@ export default function GlobalTradeManager() {
                 >
                   <PhoneOff size={16} /> Recusar
                 </button>
-
                 <button
                   onClick={handleAccept}
                   disabled={loading}
@@ -468,13 +441,7 @@ export default function GlobalTradeManager() {
                     transition: "all 0.2s"
                   }}
                 >
-                  {loading ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <>
-                      <PhoneCall size={16} /> Aceitar Troca
-                    </>
-                  )}
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : <><PhoneCall size={16} /> Aceitar Troca</>}
                 </button>
               </div>
             </motion.div>
@@ -482,7 +449,7 @@ export default function GlobalTradeManager() {
         )}
       </AnimatePresence>
 
-      {/* 🔴 OVERLAY DE CHAMADA ENVIADA (OUTGOING CALL PANEL) */}
+      {/* 🔴 OVERLAY DE CHAMADA ENVIADA */}
       <AnimatePresence>
         {outgoingCall && receiverProfile && (
           <div style={{
@@ -501,10 +468,8 @@ export default function GlobalTradeManager() {
                 boxShadow: "0 30px 80px rgba(0,0,0,0.6)"
               }}
             >
-              {/* Efeito Pulsante Radar Azul */}
               <div style={{ position: "relative", width: 90, height: 90, margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div className="outgoing-pulse" style={{ position: "absolute", inset: -16, borderRadius: "50%", background: "var(--primary)", opacity: 0.12 }} />
-                
                 <div style={{
                   width: 80, height: 80, borderRadius: 24, overflow: "hidden",
                   border: "3px solid var(--primary)", boxShadow: "0 0 20px rgba(0,174,239,0.3)",
@@ -545,17 +510,10 @@ export default function GlobalTradeManager() {
         )}
       </AnimatePresence>
 
-      {/* ESTILOS DE RIPPLE E PULSOS CINEMATOGRÁFICOS */}
       <style jsx global>{`
-        .call-ripple-1 {
-          animation: ripple-wave 1.6s infinite ease-out;
-        }
-        .call-ripple-2 {
-          animation: ripple-wave 1.6s infinite ease-out 0.6s;
-        }
-        .outgoing-pulse {
-          animation: pulse-grow 1.8s infinite ease-in-out;
-        }
+        .call-ripple-1 { animation: ripple-wave 1.6s infinite ease-out; }
+        .call-ripple-2 { animation: ripple-wave 1.6s infinite ease-out 0.6s; }
+        .outgoing-pulse { animation: pulse-grow 1.8s infinite ease-in-out; }
         @keyframes ripple-wave {
           0% { transform: scale(0.9); opacity: 0.8; }
           100% { transform: scale(1.4); opacity: 0; }
