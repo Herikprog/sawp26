@@ -1,6 +1,15 @@
 import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
-  // Bypassing Supabase check for local preview
-  redirect("/login");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/dashboard");
+  } else {
+    redirect("/login");
+  }
 }
