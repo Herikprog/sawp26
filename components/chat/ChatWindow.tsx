@@ -468,12 +468,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       channelRef.current.send({
         type: "broadcast",
         event: "trade_sync",
-        payload: {
-          userId: myUserId,
-          offers: myOffers,
-          accepted: acceptedStatus,
-          isActive: true
-        }
+        payload: { userId: myUserId, offers: myOffers, accepted: acceptedStatus, isActive: true }
       });
     }
   }
@@ -523,12 +518,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       updatedOffers = [...tradeSession.myOffers, { codigo: cleanCode, quantity: 1 }];
     }
 
-    setTradeSession(prev => {
-      const next = { ...prev, myOffers: updatedOffers, myAccepted: false, errorMessage: "" };
-      broadcastOffers(updatedOffers, false);
-      return next;
-    });
-
+    setTradeSession(prev => ({ ...prev, myOffers: updatedOffers, myAccepted: false, errorMessage: "" }));
+    broadcastOffers(updatedOffers, false);
     setManualCode("");
   }
 
@@ -641,15 +632,9 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       return;
     }
 
-    setTradeSession(prev => {
-      const next = { ...prev, myAccepted: nextAccept, errorMessage: "" };
-      broadcastOffers(prev.myOffers, nextAccept);
-      return next;
-    });
+    setTradeSession(prev => ({ ...prev, myAccepted: nextAccept, errorMessage: "" }));
+    broadcastOffers(tradeSession.myOffers, nextAccept);
 
-    // BUG1 FIX: Race condition — só o utilizador com o ID lexicograficamente menor
-    // executa a troca. O outro aguarda o broadcast "completed" para fechar o painel.
-    // Isto garante execução única mesmo que ambos aceitem em simultâneo.
     if (nextAccept && tradeSession.otherAccepted) {
       const iAmExecutor = myUserId < otherUser.id;
       if (iAmExecutor) {
