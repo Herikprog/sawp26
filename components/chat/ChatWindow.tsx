@@ -338,12 +338,21 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     if (hasMarkedRef.current) return; // Já marcou esta série de mensagens
     hasMarkedRef.current = true;
 
-    void supabase
-      .from("messages")
-      .update({ read: true })
-      .eq("conversation_id", conversationId)
-      .not("sender_id", "eq", myUserId)
-      .eq("read", false);
+    async function mark() {
+      const { error } = await supabase
+        .from("messages")
+        .update({ read: true })
+        .eq("conversation_id", conversationId)
+        .neq("sender_id", myUserId)
+        .eq("read", false);
+        
+      if (error) {
+        console.error("Erro ao marcar mensagens como lidas:", error);
+        hasMarkedRef.current = false; // Permite retentar se falhou
+      }
+    }
+    
+    mark();
   }, [messages, conversationId, myUserId, supabase]);
 
   // Digitação
@@ -1025,6 +1034,20 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                   }}
                 >
                   Recusar / Sair
+                </button>
+                <button
+                  onClick={proposeTradeCall}
+                  disabled={tradeSession.isExecuting || (tradeSession.myOffers.length === 0 && tradeSession.otherOffers.length === 0)}
+                  style={{
+                    flex: isMobile ? 1 : "none",
+                    background: "var(--warning)", color: "#000",
+                    border: "none", padding: "12px 24px", borderRadius: 14,
+                    fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    boxShadow: "0 8px 24px -4px rgba(245,166,35,0.3)",
+                    transition: "all 0.3s ease"
+                  }}
+                >
+                  <PhoneCall size={14} /> Chamada
                 </button>
                 <button
                   onClick={toggleAccept}
