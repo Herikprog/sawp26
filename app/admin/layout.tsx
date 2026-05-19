@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
@@ -33,16 +33,7 @@ export default async function AdminLayout({
   const isEmailAdmin = user?.email === "bragawork01@gmail.com";
 
   if (!isEmailAdmin && !profile?.is_admin) {
-    // Retornar 404 para esconder a rota
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", background: "#0a0a0a", color: "#fff", flexDirection: "column", gap: 16
-      }}>
-        <span style={{ fontSize: 64 }}>404</span>
-        <p style={{ color: "#666" }}>Página não encontrada.</p>
-      </div>
-    );
+    notFound();
   }
 
   return (
