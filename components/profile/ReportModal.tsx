@@ -1,6 +1,5 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldAlert, X, AlertTriangle, Send, Loader2 } from "lucide-react";
@@ -25,7 +24,13 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName 
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +74,9 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName 
     }
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div style={{
@@ -104,7 +111,8 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName 
               boxShadow: "0 25px 50px -12px rgba(255, 77, 106, 0.15)",
               padding: "28px 24px",
               zIndex: 10,
-              overflow: "hidden"
+              maxHeight: "90vh",
+              overflowY: "auto"
             }}
           >
             {/* Efeito Glow Lindo no Fundo */}
@@ -267,6 +275,7 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName 
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
