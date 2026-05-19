@@ -11,8 +11,7 @@ export default async function AdminLayout({
 
   if (!user) redirect("/login");
 
-  const adminClient = await createAdminClient();
-  const { data: profile } = await adminClient
+  const { data: profile } = await supabase
     .from("profiles")
     .select("is_admin, nome")
     .eq("id", user.id)
