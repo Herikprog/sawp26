@@ -33,3 +33,8 @@ DROP POLICY IF EXISTS "push_subscriptions_delete_own" ON push_subscriptions;
 CREATE POLICY "push_subscriptions_delete_own"
   ON push_subscriptions FOR DELETE
   USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "push_subscriptions_update_own" ON push_subscriptions;
+CREATE POLICY "push_subscriptions_update_own"
+  ON push_subscriptions FOR UPDATE
+  USING (auth.uid() = user_id);
