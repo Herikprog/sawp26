@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     // ─── 1. CASO: Nova mensagem de chat recebida ───
     if (table === "messages") {
-      const { conversation_id, sender_id, text } = record;
+      const { conversation_id, sender_id, content } = record;
 
       // Obter a conversa para descobrir quem é o destinatário (o outro participante)
       const { data: conv, error: convErr } = await supabaseAdmin
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         .single();
 
       pushTitle = sender?.nome ? `${sender.nome}` : "Nova Mensagem";
-      pushBody = text || "Enviou-lhe um anexo ou figurinha.";
+      pushBody = content || "Enviou-lhe um anexo ou figurinha.";
       pushUrl = `/chat/${conversation_id}`;
     } 
     // ─── 2. CASO: Nova notificação global do sistema ───

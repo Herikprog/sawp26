@@ -188,7 +188,7 @@ export default function RealtimeManager() {
               <div style={{ flex: 1, fontSize: 13, lineHeight: 1.4 }}>
                 <div style={{ fontWeight: 700, color: "var(--primary)" }}>{sender.nome}</div>
                 <div style={{ color: "var(--text-muted)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: 200 }}>
-                  {newMsg.text || "Enviou uma figurinha ou proposta."}
+                  {newMsg.content || "Enviou uma figurinha ou proposta."}
                 </div>
               </div>
             </div>
