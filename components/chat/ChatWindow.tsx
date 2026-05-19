@@ -310,6 +310,17 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               otherAccepted: myAccepted ?? prev.otherAccepted,
             };
 
+            // SE EU SOU O EXECUTOR (UUID menor), AMBOS OS LADOS ACEITARAM E A TROCA NÃO ESTÁ EM EXECUÇÃO
+            const iAmExecutor = myUserId < otherUser.id;
+            const bothAccepted = prev.myAccepted && (myAccepted ?? prev.otherAccepted);
+            if (iAmExecutor && bothAccepted && !prev.isExecuting && !completed) {
+              const finalMyOffers = prev.myOffers;
+              const finalOtherOffers = myOffers ?? prev.otherOffers;
+              setTimeout(() => {
+                executeStickerExchange(finalMyOffers, finalOtherOffers);
+              }, 0);
+            }
+
             // Se o outro utilizador cancelar
             if (isActive === false && prev.isActive) {
               // Ignorar broadcasts de fecho que chegam nos primeiros 2 segundos após abertura
@@ -680,7 +691,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     }
   }
 
-  async function executeStickerExchange() {
+  async function executeStickerExchange(
+    myOffersToUse: TradeOffer[] = tradeSession.myOffers,
+    otherOffersToUse: TradeOffer[] = tradeSession.otherOffers
+  ) {
     setTradeSession(prev => ({ ...prev, isExecuting: true, errorMessage: "" }));
     
     // Chamar a procedure transacionada no banco de dados
@@ -688,8 +702,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       p_conversation_id: conversationId,
       p_user_a_id: myUserId,
       p_user_b_id: otherUser.id,
-      p_user_a_offers: tradeSession.myOffers,
-      p_user_b_offers: tradeSession.otherOffers
+      p_user_a_offers: myOffersToUse,
+      p_user_b_offers: otherOffersToUse
     });
 
     if (error) {
