@@ -18,12 +18,6 @@ export default async function FeedPage() {
     .eq("id", user.id)
     .single();
 
-  const { count: unreadCount } = await supabase
-    .from("social_notifications")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("is_read", false);
-
   const { data: posts, error: postsErr } = await supabase
     .from("posts")
     .select("*, user:profiles!posts_user_id_fkey(*)")
@@ -53,7 +47,7 @@ export default async function FeedPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px 100px" }}>
-      <FeedHeader unreadCount={unreadCount || 0} />
+      <FeedHeader />
 
       {/* Input */}
       <div style={{ borderBottom: "1px solid var(--border-color)", marginBottom: 8 }}>

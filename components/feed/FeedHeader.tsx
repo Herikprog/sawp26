@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Bell, Users } from "lucide-react";
-import Link from "next/link";
+import { Search, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import NotificationsPopup from "./NotificationsPopup";
 
-export default function FeedHeader({ unreadCount }: { unreadCount: number }) {
+export default function FeedHeader() {
   const [search, setSearch] = useState("");
-  const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
 
   function handleSearch(e: React.FormEvent) {
@@ -64,33 +61,6 @@ export default function FeedHeader({ unreadCount }: { unreadCount: number }) {
             }} 
           />
         </form>
-
-        <button 
-          onClick={() => setShowNotifications(v => !v)}
-          style={{ 
-            position: "relative", color: "var(--text-main)", padding: 10, background: "var(--input-bg)", 
-            border: "1px solid var(--border-color)", cursor: "pointer", borderRadius: 12,
-            transition: "all 0.2s ease", display: "flex", alignItems: "center", justifyContent: "center"
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "var(--bg-hover-strong)"}
-          onMouseLeave={e => e.currentTarget.style.background = "var(--input-bg)"}
-        >
-          <Bell size={18} />
-          {unreadCount > 0 && !showNotifications && (
-            <span style={{ 
-              position: "absolute", top: -4, right: -4, background: "var(--danger)", color: "white", 
-              fontSize: 10, fontWeight: 800, width: 18, height: 18, borderRadius: "50%", 
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(255,77,106,0.4)", border: "2px solid var(--card-bg)"
-            }}>
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </button>
-
-        {showNotifications && (
-          <NotificationsPopup onClose={() => setShowNotifications(false)} />
-        )}
       </div>
     </header>
   );

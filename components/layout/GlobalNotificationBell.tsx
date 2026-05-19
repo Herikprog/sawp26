@@ -76,6 +76,29 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
     };
   }, [supabase, isMobile]);
 
+  // Marcar todas como lidas automaticamente ao abrir o painel
+  useEffect(() => {
+    if (isOpen && unreadCount > 0) {
+      const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+      if (unreadIds.length > 0) {
+        // Feedback visual instantâneo local para máxima responsividade
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+
+        // Atualizar no Supabase em background
+        supabase
+          .from("social_notifications")
+          .update({ is_read: true })
+          .in("id", unreadIds)
+          .then(({ error }: any) => {
+            if (error) {
+              console.error("Erro ao marcar notificações como lidas automaticamente:", error);
+            }
+          });
+      }
+    }
+  }, [isOpen, unreadCount, notifications, supabase]);
+
   // Marcar todas como lidas manualmente (Melhoria do sistema!)
   async function handleMarkAllAsRead() {
     setLoading(true);
