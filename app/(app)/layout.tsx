@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/layout/Sidebar";
-import MobileNav from "@/components/layout/MobileNav";
 import RealtimeManager from "@/components/RealtimeManager";
 import GlobalTradeManager from "@/components/trade/GlobalTradeManager";
 import GlobalNotificationBell from "@/components/layout/GlobalNotificationBell";
@@ -57,13 +56,8 @@ export default async function AppLayout({
           {/* Top spacer for mobile top-nav */}
           <div className="md:hidden" style={{ height: 64 }} />
           {children}
-          {/* Bottom spacer to prevent content from going under mobile bottom nav */}
-          <div className="md:hidden" style={{ height: 88 }} />
         </div>
       </main>
-
-      {/* Mobile bottom nav */}
-      <MobileNav />
     </div>
   );
 }

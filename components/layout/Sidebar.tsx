@@ -294,40 +294,44 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
     </div>
   );
 
+  const isChatRoom = pathname.startsWith("/chat/") && pathname !== "/chat";
+
   return (
     <>
       {/* MOBILE TOP NAVBAR */}
-      <div className="md:hidden glass flex items-center justify-between" style={{
-        position: "fixed", top: 0, left: 0, right: 0, height: 64,
-        padding: "0 20px", zIndex: 30, borderBottom: "1px solid var(--border-color)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 10,
-            background: "var(--gradient-primary)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16,
-          }}>
-            ⚽
+      {!isChatRoom && (
+        <div className="md:hidden glass flex items-center justify-between" style={{
+          position: "fixed", top: 0, left: 0, right: 0, height: 64,
+          padding: "0 20px", zIndex: 30, borderBottom: "1px solid var(--border-color)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: "var(--gradient-primary)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16,
+            }}>
+              ⚽
+            </div>
+            <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.04em" }}>
+              Swap<span style={{ color: "var(--primary)" }}>26</span>
+            </span>
           </div>
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.04em" }}>
-            Swap<span style={{ color: "var(--primary)" }}>26</span>
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <GlobalNotificationBell isMobile={true} />
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              style={{
+                background: "transparent", border: "none", color: "var(--text-main)",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 8,
+              }}
+            >
+              <Menu size={24} />
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <GlobalNotificationBell isMobile={true} />
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            style={{
-              background: "transparent", border: "none", color: "var(--text-main)",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 8,
-            }}
-          >
-            <Menu size={24} />
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* MOBILE DRAWER */}
       <AnimatePresence>

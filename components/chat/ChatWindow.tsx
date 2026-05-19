@@ -785,8 +785,11 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: isMobile ? "100dvh" : "100%", maxWidth: isMobile ? "100%" : 800,
-      margin: "0 auto", width: "100%", background: "var(--bg-main)", position: "relative"
+      display: "flex", flexDirection: "column", height: "100%", maxWidth: isMobile ? "100%" : 800,
+      margin: "0 auto", width: "100%", background: "var(--bg-main)",
+      position: isMobile ? "absolute" : "relative",
+      inset: isMobile ? 0 : undefined,
+      zIndex: isMobile ? 40 : undefined,
     }}>
       {/* Header do Chat */}
       <div style={{
