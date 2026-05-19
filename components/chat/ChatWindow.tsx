@@ -51,6 +51,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     errorMessage: "",
     isExecuting: false
   });
+  const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
   
   const [myInventory, setMyInventory] = useState<Record<string, number>>({});
   const [myDuplicates, setMyDuplicates] = useState<{ codigo: string; quantity: number }[]>([]);
@@ -217,6 +218,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           errorMessage: "",
           isExecuting: false
         });
+        setActiveTradeId(tradeId);
 
         // Limpar o query param tradeId da URL de forma elegante
         const newUrl = window.location.pathname;
@@ -443,8 +445,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         event: "trade_sync",
         payload: {
           userId: myUserId,
-          offers: [],
-          accepted: false,
+          myOffers: [],
+          myAccepted: false,
           isActive: true
         }
       });
@@ -452,7 +454,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     toast.success("Painel de Troca em tempo real aberto!");
   }
 
-  function cancelTrade() {
+  async function cancelTrade() {
     setTradeSession({
       isActive: false,
       myOffers: [],
@@ -462,6 +464,11 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       errorMessage: "",
       isExecuting: false
     });
+
+    if (activeTradeId) {
+      supabase.from("trades").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", activeTradeId).then();
+      setActiveTradeId(null);
+    }
 
     if (channelRef.current) {
       channelRef.current.send({
@@ -686,6 +693,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
       });
       toast.error("Falha ao concluir troca. Verifique o alerta no painel.");
     } else {
+      if (activeTradeId) {
+        await supabase.from("trades").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", activeTradeId);
+      }
+
       toast.success("🏆 Troca realizada e álbuns atualizados com sucesso!");
 
       // BUG2 FIX: Notificar o outro lado para fechar o painel (ele não executa, só aguarda)
@@ -701,6 +712,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         isActive: false, myOffers: [], otherOffers: [],
         myAccepted: false, otherAccepted: false, errorMessage: "", isExecuting: false
       });
+      setActiveTradeId(null);
 
       loadInventory();
     }
@@ -946,7 +958,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 </div>
 
                 {/* Lista de figurinhas oferecidas */}
-                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, minHeight: 120 }}>
+                <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 6, minHeight: 120 }}>
                   {tradeSession.myOffers.length === 0 ? (
                     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 12, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 80 }}>
                       Nenhuma figurinha oferecida.
@@ -989,7 +1001,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 </div>
 
                 {/* Lista de figurinhas oferecidas pelo outro */}
-                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, minHeight: 120 }}>
+                <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 6, minHeight: 120 }}>
                   {tradeSession.otherOffers.length === 0 ? (
                     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 12, border: "1px dashed rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 80 }}>
                       Nenhuma figurinha oferecida por {otherUser.nome.split(" ")[0]} ainda.
