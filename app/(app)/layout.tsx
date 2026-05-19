@@ -4,6 +4,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import RealtimeManager from "@/components/RealtimeManager";
 import GlobalTradeManager from "@/components/trade/GlobalTradeManager";
 import GlobalNotificationBell from "@/components/layout/GlobalNotificationBell";
+import AppLayoutClient from "@/components/layout/AppLayoutClient";
 
 export default async function AppLayout({
   children,
@@ -48,15 +49,9 @@ export default async function AppLayout({
           position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
         }} />
 
-        <div style={{
-          width: "100%", height: "100%",
-          overflowY: "auto", overflowX: "hidden",
-          position: "relative", zIndex: 1,
-        }}>
-          {/* Top spacer for mobile top-nav */}
-          <div className="md:hidden" style={{ height: 64 }} />
+        <AppLayoutClient>
           {children}
-        </div>
+        </AppLayoutClient>
       </main>
     </div>
   );
