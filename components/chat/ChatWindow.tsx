@@ -217,8 +217,8 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
         // Notificar o outro colecionador via broadcast, com retry até o canal estar pronto
         broadcastWhenReady({
           userId: myUserId,
-          offers: myOffers,
-          accepted: false,
+          myOffers: myOffers,
+          myAccepted: false,
           isActive: true
         });
 
@@ -463,12 +463,12 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     toast.error("Troca cancelada.");
   }
 
-  function broadcastOffers(myOffers: TradeOffer[], acceptedStatus: boolean) {
+  function broadcastOffers(myOffersList: TradeOffer[], acceptedStatus: boolean) {
     if (channelRef.current) {
       channelRef.current.send({
         type: "broadcast",
         event: "trade_sync",
-        payload: { userId: myUserId, offers: myOffers, accepted: acceptedStatus, isActive: true }
+        payload: { userId: myUserId, myOffers: myOffersList, myAccepted: acceptedStatus, isActive: true }
       });
     }
   }
