@@ -25,7 +25,9 @@ import {
   Trophy,
   Sparkles,
   Menu,
-  X
+  X,
+  HelpCircle,
+  Shield
 } from "lucide-react";
 
 const NAV = [
@@ -119,7 +121,11 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
 
       {/* Navigation */}
       <nav style={{ flex: 1, padding: "0 12px", display: "flex", flexDirection: "column", gap: 2, position: "relative", zIndex: 1, overflowY: "auto" }}>
-        {NAV.map(({ href, icon: Icon, label, accent }) => {
+        {[
+          ...NAV,
+          { href: "/support", icon: HelpCircle, label: "Suporte", accent: "#38bdf8" },
+          ...(profile && (profile as any).is_admin ? [{ href: "/admin", icon: Shield, label: "Painel Admin", accent: "#ef4444" }] : []),
+        ].map(({ href, icon: Icon, label, accent }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link

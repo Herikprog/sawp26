@@ -1,60 +1,100 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+
+// Rotas que não precisam de sessão nem de assinatura
+const PUBLIC_ROUTES = ["/login", "/register", "/auth", "/banned"];
+
+// Rotas que precisam de sessão mas NÃO precisam de assinatura ativa
+const SESSION_ONLY_ROUTES = ["/premium", "/api", "/admin"];
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  const { pathname } = request.nextUrl;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("your_supabase")) {
-    return response;
+  // Deixar passar rotas públicas e assets
+  if (
+    PUBLIC_ROUTES.some((r) => pathname.startsWith(r)) ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/icon") ||
+    pathname.startsWith("/flags") ||
+    pathname === "/"
+  ) {
+    return NextResponse.next();
   }
 
+  // Criar resposta mutável para poder escrever cookies de sessão
+  let response = NextResponse.next({
+    request: { headers: request.headers },
+  });
+
   const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
         },
       },
     }
   );
 
-  // IMPORTANTE: Isto renova e persiste a cookie da sessão caso ela esteja próxima do vencimento
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Sem sessão → redirecionar para login
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Rotas que só precisam de sessão (admin, api, premium) — sem verificar assinatura
+  if (SESSION_ONLY_ROUTES.some((r) => pathname.startsWith(r))) {
+    return response;
+  }
+
+  // Verificar estado do perfil para rotas protegidas
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plano, is_banned, suspended_until")
+    .eq("id", user.id)
+    .single();
+
+  // Conta banida → redirecionar para página de ban
+  if (profile?.is_banned) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/banned";
+    return NextResponse.redirect(url);
+  }
+
+  // Conta suspensa → redirecionar para página de suspensão
+  if (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/banned";
+    url.searchParams.set("until", profile.suspended_until);
+    return NextResponse.redirect(url);
+  }
+
+  // Sem assinatura → redirecionar para página premium (paywall)
+  if (!profile || profile.plano !== "premium") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/premium";
+    url.searchParams.set("paywall", "1");
+    return NextResponse.redirect(url);
+  }
 
   return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - sw.js, file.svg, etc. (Service Worker e outros ficheiros públicos)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|css)).*)",
   ],
 };

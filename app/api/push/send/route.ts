@@ -13,22 +13,21 @@ if (vapidPublicKey && vapidPrivateKey) {
   );
 }
 
-// Instanciar o cliente administrativo do Supabase para ignorar políticas RLS na leitura das subscrições
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole || "placeholder-to-prevent-supabase-sdk-crash");
-
 export async function POST(request: Request) {
   if (!vapidPublicKey || !vapidPrivateKey) {
     console.error("VAPID Keys não configuradas nas variáveis de ambiente da Vercel.");
     return NextResponse.json({ error: "VAPID Keys não configuradas." }, { status: 500 });
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
   if (!supabaseServiceRole) {
     console.error("SUPABASE_SERVICE_ROLE_KEY não configurada nas variáveis de ambiente da Vercel.");
     return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada." }, { status: 500 });
   }
+
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
 
   try {
     // Obter o payload enviado pelo Webhook do Supabase

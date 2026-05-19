@@ -2,11 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BookOpen, Shuffle, MessageCircle, Users, TrendingUp, ChevronRight, Trophy, Star, Zap, MapPin, Target, Flame } from "lucide-react";
+import GlobalAnnouncements from "@/components/GlobalAnnouncements";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
 
   const { data: profile } = await supabase
     .from("profiles").select("*").eq("id", user.id).single();
@@ -30,6 +32,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="pattern-bg" style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 24px", position: "relative" }}>
+
+      {/* Global Announcements Banner */}
+      <GlobalAnnouncements />
 
       {/* Ambient orbs */}
       <div className="orb" style={{ top: -120, right: -80, width: 400, height: 400, background: "var(--primary)", opacity: 0.04 }} />
