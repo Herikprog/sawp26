@@ -40,7 +40,7 @@ export default async function ChatRoomPage({ params }: Props) {
     .limit(100);
 
   return (
-    <div className="h-dvh flex flex-col">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       <ChatWindow
         conversationId={id}
         initialMessages={(messages as Message[]) ?? []}
