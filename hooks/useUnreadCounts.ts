@@ -38,7 +38,8 @@ export function useUnreadCounts() {
 
     loadCounts();
 
-    const channel = supabase.channel("global-counts")
+    const channelId = `global-counts-${Math.random().toString(36).substring(2, 9)}`;
+    const channel = supabase.channel(channelId)
       .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
         loadCounts();
       })
