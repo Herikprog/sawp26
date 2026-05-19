@@ -18,7 +18,9 @@ export default async function AdminLayout({
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_admin) {
+  const isEmailAdmin = user.email === "bragawork01@gmail.com";
+
+  if (!isEmailAdmin && !profile?.is_admin) {
     // Retornar 404 para esconder a rota
     return (
       <div style={{
@@ -43,7 +45,7 @@ export default async function AdminLayout({
             Admin Panel
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>Swap26</div>
-          <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>{profile.nome}</div>
+          <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>{profile?.nome || user.email}</div>
         </div>
 
         <nav style={{ padding: "16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>

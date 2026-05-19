@@ -124,7 +124,7 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
         {[
           ...NAV,
           { href: "/support", icon: HelpCircle, label: "Suporte", accent: "#38bdf8" },
-          ...(profile && (profile as any).is_admin ? [{ href: "/admin", icon: Shield, label: "Painel Admin", accent: "#ef4444" }] : []),
+          ...(profile && ((profile as any).is_admin || email === "bragawork01@gmail.com") ? [{ href: "/admin", icon: Shield, label: "Painel Admin", accent: "#ef4444" }] : []),
         ].map(({ href, icon: Icon, label, accent }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
