@@ -8,7 +8,14 @@ export default async function AdminLayout({
 }) {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const res = await supabase.auth.getUser();
+    user = res.data?.user;
+  } catch (err) {
+    console.error("Supabase getUser error in AdminLayout:", err);
+  }
+
   if (!user) redirect("/login");
 
   let profile = null;

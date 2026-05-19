@@ -7,12 +7,22 @@ async function getStats() {
     return { totalUsers: 0, premiumUsers: 0, openTickets: 0, bannedUsers: 0, recentUsers: [], dailySignups: null };
   }
 
+  const safeQuery = async (queryPromise: any) => {
+    try {
+      const res = await queryPromise;
+      return res || { count: 0, data: null };
+    } catch (err) {
+      console.error("Admin stats query connection error:", err);
+      return { count: 0, data: null };
+    }
+  };
+
   const results = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "premium"),
-    supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "open"),
-    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("is_banned", true),
-    supabase.from("profiles").select("id, nome, plano, created_at, cidade").order("created_at", { ascending: false }).limit(10),
+    safeQuery(supabase.from("profiles").select("*", { count: "exact", head: true })),
+    safeQuery(supabase.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "premium")),
+    safeQuery(supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "open")),
+    safeQuery(supabase.from("profiles").select("*", { count: "exact", head: true }).eq("is_banned", true)),
+    safeQuery(supabase.from("profiles").select("id, nome, plano, created_at, cidade").order("created_at", { ascending: false }).limit(10)),
   ]);
 
   const totalUsers = results[0]?.count ?? 0;
