@@ -56,8 +56,10 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const [myDuplicates, setMyDuplicates] = useState<{ codigo: string; quantity: number }[]>([]);
   const [manualCode, setManualCode] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (typeof window === "undefined") return;
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -633,6 +635,12 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   async function toggleAccept() {
     const nextAccept = !tradeSession.myAccepted;
 
+    // Prevenir aceitar uma troca vazia!
+    if (nextAccept && tradeSession.myOffers.length === 0 && tradeSession.otherOffers.length === 0) {
+      toast.error("Adicione pelo menos uma figurinha na troca antes de aceitar!");
+      return;
+    }
+
     setTradeSession(prev => {
       const next = { ...prev, myAccepted: nextAccept, errorMessage: "" };
       broadcastOffers(prev.myOffers, nextAccept);
@@ -788,7 +796,9 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               }} title={`Status: ${connStatus}`} />
             </div>
             <p style={{ fontSize: 12, color: otherUser.is_online ? "var(--success)" : "var(--text-muted)", margin: 0 }}>
-              {otherUser.is_online ? "Online agora" : `Visto há ${timeAgo(otherUser.last_seen)}`}
+              {mounted 
+                ? (otherUser.is_online ? "Online agora" : `Visto há ${timeAgo(otherUser.last_seen)}`)
+                : "Carregando..."}
             </p>
           </div>
         </div>
@@ -1037,7 +1047,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                 </button>
                 <button
                   onClick={proposeTradeCall}
-                  disabled={tradeSession.isExecuting || (tradeSession.myOffers.length === 0 && tradeSession.otherOffers.length === 0)}
+                  disabled={tradeSession.isExecuting}
                   style={{
                     flex: isMobile ? 1 : "none",
                     background: "var(--warning)", color: "#000",
