@@ -116,9 +116,7 @@ export async function POST(request: Request) {
 
     // ─── 3. Procurar subscrições ativas do utilizador alvo ───
     const { data: subscriptions, error: subErr } = await supabaseAdmin
-      .from("push_subscriptions")
-      .select("endpoint, p256dh, auth")
-      .eq("user_id", recipientId);
+      .rpc("get_user_push_subscriptions", { p_user_id: recipientId });
 
     if (subErr) {
       console.error("Erro ao ler subscrições do Supabase:", subErr.message);
@@ -130,7 +128,7 @@ export async function POST(request: Request) {
     }
 
     // ─── 4. Efetuar o envio concorrente para todos os dispositivos registados ───
-    const sendPromises = subscriptions.map(async (sub) => {
+    const sendPromises = (subscriptions as any[]).map(async (sub: any) => {
       const pushSubscription = {
         endpoint: sub.endpoint,
         keys: {
@@ -153,9 +151,7 @@ export async function POST(request: Request) {
         if (err.statusCode === 410 || err.statusCode === 404) {
           console.log(`Limpando subscrição expirada no endpoint: ${sub.endpoint}`);
           await supabaseAdmin
-            .from("push_subscriptions")
-            .delete()
-            .eq("endpoint", sub.endpoint);
+            .rpc("delete_expired_push_subscription", { p_endpoint: sub.endpoint });
         } else {
           console.error("Falha ao enviar notificação push:", err);
         }
