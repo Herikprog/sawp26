@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -8,51 +8,60 @@ import { type MatchResult, getFlagUrl } from "@/types";
 import { formatDistance } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
-import { MessageCircle, Zap, MapPin, User, PhoneCall } from "lucide-react";
+import { MessageCircle, MapPin, User, PhoneCall } from "lucide-react";
 import toast from "react-hot-toast";
-
 import { createClient } from "@/lib/supabase/client";
 
-// Função para criar o pino premium do utilizador atual (bola azul flutuante de radar calibrada de 96px com foto de perfil)
+// Sanitiza uma URL de avatar para evitar injecção de atributos HTML via template literal
+function sanitizeUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    // Escapa aspas que poderiam quebrar o atributo src=""
+    return parsed.href.replace(/"/g, "%22").replace(/'/g, "%27");
+  } catch {
+    return null;
+  }
+}
+
+// Pino do utilizador actual (bola azul flutuante de radar com foto de perfil)
 function createCurrentUserIcon(avatarUrl: string | null, nome: string) {
   const size = 96;
   const imgSize = 84;
-  const innerHtml = avatarUrl 
-    ? `<img src="${avatarUrl}" style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; object-fit: cover;" />`
-    : `<div style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
+  const safeUrl = sanitizeUrl(avatarUrl);
+  const innerHtml = safeUrl
+    ? `<img src="${safeUrl}" alt="" style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; object-fit: cover;" />`
+    : `<div style="width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800;">${(nome[0] ?? "?").toUpperCase()}</div>`;
 
   return L.divIcon({
     className: "my-profile-dot",
     html: `
       <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
-        <!-- Anel pulsante calibrado de radar azul -->
         <div class="pulse-glow" style="position: absolute; inset: -8px; background: #00AEEF; border-radius: 50%; opacity: 0.25;"></div>
-        <!-- Bola azul flutuante brilhante sem ponta/direcional -->
         <div style="position: absolute; inset: 0; background: #00AEEF; border-radius: 50%; box-shadow: 0 0 20px rgba(0,174,239,0.5); border: 3px solid #FFFFFF;"></div>
-        <!-- Foto de Perfil embutida calibrada -->
         <div style="position: relative; z-index: 2; width: ${imgSize}px; height: ${imgSize}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
           ${innerHtml}
         </div>
       </div>
     `,
     iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2], // Fixa a ancoragem no centro absoluto do circulo da zona!
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
-// Função para criar o pino premium das matches (azul brilhante com foto de perfil)
+// Pino das matches (pointer azul com foto de perfil)
 function createMatchUserIcon(avatarUrl: string | null, nome: string) {
-  const innerHtml = avatarUrl 
-    ? `<img src="${avatarUrl}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />`
-    : `<div style="width: 26px; height: 26px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">${nome[0]?.toUpperCase() || "?"}</div>`;
+  const safeUrl = sanitizeUrl(avatarUrl);
+  const innerHtml = safeUrl
+    ? `<img src="${safeUrl}" alt="" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />`
+    : `<div style="width: 26px; height: 26px; border-radius: 50%; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">${(nome[0] ?? "?").toUpperCase()}</div>`;
 
   return L.divIcon({
     className: "match-profile-pin",
     html: `
       <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
-        <!-- Pointer drop azul royal -->
         <div style="position: absolute; width: 34px; height: 34px; background: #00AEEF; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); box-shadow: 0 4px 15px rgba(0,174,239,0.3); border: 2px solid #FFFFFF;"></div>
-        <!-- Foto de Perfil embutida -->
         <div style="position: relative; z-index: 2; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07111F;">
           ${innerHtml}
         </div>
@@ -71,45 +80,57 @@ function getZoomForRadius(rad: number) {
   return 10;
 }
 
-// Componente auxiliar para animar e centrar o mapa suavemente quando a localização ou raio mudar
+// Anima e centra o mapa suavemente quando o centro ou raio mudar
 function ChangeView({ center, radius }: { center: [number, number]; radius: number }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, getZoomForRadius(radius), {
-      animate: true,
-      duration: 1.5
-    });
+    map.flyTo(center, getZoomForRadius(radius), { animate: true, duration: 1.5 });
   }, [center, radius, map]);
   return null;
 }
 
-// Helper para decodificar WKB Hex de PostGIS
+// Decodifica WKB Hex do PostGIS para { lat, lon }
 function decodeWKB(wkbHex: string | null): { lat: number; lon: number } | null {
-  if (!wkbHex || wkbHex.length < 50) return null;
+  if (!wkbHex || wkbHex.length < 50) {
+    if (wkbHex) console.warn("[decodeWKB] String curta demais para ser WKB válido:", wkbHex);
+    return null;
+  }
+  // Verificar se é WKT (ex: "POINT(...)") ou JSON em vez de WKB hex
+  if (!wkbHex.match(/^[0-9a-fA-F]+$/)) {
+    console.warn("[decodeWKB] Valor não parece WKB hex — pode ser WKT ou JSON:", wkbHex.substring(0, 40));
+    return null;
+  }
   try {
     const hasSrid = wkbHex.substring(10, 18).toLowerCase() === "e6100000";
     const xStart = hasSrid ? 18 : 10;
     const yStart = hasSrid ? 34 : 26;
-    
+
     const xHex = wkbHex.substring(xStart, xStart + 16);
     const yHex = wkbHex.substring(yStart, yStart + 16);
-    
+
     const parseDoubleLE = (hex: string): number => {
       const bytes = new Uint8Array(8);
       for (let i = 0; i < 8; i++) {
         bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
       }
-      const view = new DataView(bytes.buffer);
-      return view.getFloat64(0, true);
+      return new DataView(bytes.buffer).getFloat64(0, true);
     };
-    
+
     const lon = parseDoubleLE(xHex);
     const lat = parseDoubleLE(yHex);
-    
-    if (isNaN(lat) || isNaN(lon)) return null;
+
+    if (isNaN(lat) || isNaN(lon)) {
+      console.warn("[decodeWKB] Coordenadas resultaram em NaN para hex:", wkbHex.substring(0, 40));
+      return null;
+    }
+    // Validação de limites geográficos básicos
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      console.warn("[decodeWKB] Coordenadas fora de limites geográficos:", { lat, lon });
+      return null;
+    }
     return { lat, lon };
   } catch (e) {
-    console.error("WKB Decoding error:", e);
+    console.error("[decodeWKB] Erro ao decodificar WKB:", e);
     return null;
   }
 }
@@ -118,13 +139,16 @@ interface Props {
   matches: MatchResult[];
   radius: number;
   stickersCatalog: Record<number, string>;
+  // Centro elevado do page.tsx — única fonte de verdade para GPS
+  center: [number, number];
 }
 
-export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
-  const [center, setCenter] = useState<[number, number]>([38.7223, -9.1393]);
+export default function TradeMap({ matches, radius, stickersCatalog, center }: Props) {
   const [myProfile, setMyProfile] = useState<{ nome: string; avatar_url: string | null } | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
-  const supabase = createClient();
+
+  // Supabase instanciado uma vez com useMemo — sem leaks por re-render
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function loadMyProfile() {
@@ -142,14 +166,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
     loadMyProfile();
   }, [supabase]);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCenter([pos.coords.latitude, pos.coords.longitude]),
-        () => console.warn("Geolocation blocked")
-      );
-    }
-  }, []);
+  // GPS REMOVIDO DAQUI — elevado ao page.tsx (única fonte de verdade)
 
   async function startDirectTradeCall(match: MatchResult) {
     if (!myUserId) {
@@ -180,10 +197,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
       if (error) throw error;
 
       toast.success("📞 Chamada de troca direta enviada!");
-
-      window.dispatchEvent(new CustomEvent("trigger_outgoing_trade", { 
-        detail: { trade: newTrade } 
-      }));
+      window.dispatchEvent(new CustomEvent("trigger_outgoing_trade", { detail: { trade: newTrade } }));
     } catch (err: any) {
       console.error(err);
       toast.error(`Erro ao iniciar chamada: ${err.message || "Erro desconhecido"}`);
@@ -199,10 +213,10 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {/* User's approximate area dynamic */}
+        {/* Círculo do raio de varredura */}
         <Circle center={center} radius={radius * 1000} pathOptions={{ color: "var(--primary)", fillColor: "var(--primary)", fillOpacity: 0.08, weight: 1, dashArray: "5, 10" }} />
 
-        {/* Bola de perfil flutuante e centralizada representativa da sua zona de cobertura de radar */}
+        {/* Pino do utilizador actual */}
         {myProfile && (
           <Marker position={center} icon={createCurrentUserIcon(myProfile.avatar_url, myProfile.nome)}>
             <Popup className="premium-popup">
@@ -215,25 +229,25 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
         )}
 
         {matches.map((match: any) => {
-          // Decodificar a localização WKB real do outro utilizador se disponível
-          let pos: [number, number] = [center[0], center[1]];
+          let pos: [number, number];
           const coordsDecoded = decodeWKB(match.location);
-          
+
           if (coordsDecoded) {
-            // Aplicar o desvio de privacidade (offset fuzzy de 800m) em torno de suas coordenadas reais estáveis
+            // Offset de privacidade no cliente (aprox. 600m de raio variável)
+            // NOTA: Para maior segurança mover este cálculo para SQL com ST_Project
             const angle = (match.user_id.charCodeAt(0) + match.user_id.charCodeAt(match.user_id.length - 1)) * 17;
             const radAngle = (angle % 360) * (Math.PI / 180);
-            
-            const latOffset = 0.0055 * Math.cos(radAngle);
-            const lngOffset = 0.0075 * Math.sin(radAngle);
-            
-            pos = [coordsDecoded.lat + latOffset, coordsDecoded.lon + lngOffset];
+            pos = [
+              coordsDecoded.lat + 0.0055 * Math.cos(radAngle),
+              coordsDecoded.lon + 0.0075 * Math.sin(radAngle),
+            ];
           } else {
-            // Fallback absoluto radial a partir do centro caso a coordenada falhe
+            // Fallback radial quando WKB não resolve (usa distancia_km do RPC)
             const angle = (match.user_id.length % 360) * (Math.PI / 180);
-            const latOffset = (match.distancia_km / 111) * Math.cos(angle);
-            const lngOffset = (match.distancia_km / 111) * Math.sin(angle);
-            pos = [center[0] + latOffset, center[1] + lngOffset];
+            pos = [
+              center[0] + (match.distancia_km / 111) * Math.cos(angle),
+              center[1] + (match.distancia_km / 111) * Math.sin(angle),
+            ];
           }
 
           return (
@@ -243,22 +257,22 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
                   {/* Perfil Header */}
                   <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
                     {match.avatar_url ? (
-                       <Image src={match.avatar_url} alt={match.nome} width={42} height={42} style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.1)" }} />
+                      <Image src={match.avatar_url} alt={match.nome} width={42} height={42} style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.1)" }} />
                     ) : (
-                       <div style={{ width: 42, height: 42, borderRadius: 12, background: "var(--input-bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--primary)" }}>
-                         {match.nome[0]}
-                       </div>
+                      <div style={{ width: 42, height: 42, borderRadius: 12, background: "var(--input-bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--primary)" }}>
+                        {match.nome[0]}
+                      </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                       <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--text-main)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{match.nome}</p>
-                       <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                         <MapPin size={10} style={{ color: "var(--text-muted)" }} />
-                         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDistance(match.distancia_km)}</span>
-                       </div>
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--text-main)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{match.nome}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                        <MapPin size={10} style={{ color: "var(--text-muted)" }} />
+                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDistance(match.distancia_km)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Lista de Figurinhas que Tem para Mim */}
+                  {/* Figurinhas que o outro tem para mim */}
                   <div style={{ background: "rgba(0,201,109,0.04)", border: "1px solid rgba(0,201,109,0.12)", borderRadius: 16, padding: "10px 12px", marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <span style={{ fontSize: 10, fontWeight: 800, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tem para mim</span>
@@ -270,7 +284,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
                           const code = stickersCatalog[id] || `Fig. ${id}`;
                           return (
                             <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "3px 6px", fontSize: 10, fontWeight: 700, color: "var(--text-main)", whiteSpace: "nowrap" }}>
-                              <img src={getFlagUrl(code)} style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
+                              <img src={getFlagUrl(code)} alt="" style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
                               {code}
                             </span>
                           );
@@ -284,7 +298,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
                     )}
                   </div>
 
-                  {/* Lista de Figurinhas que Eu Tenho para Ele */}
+                  {/* Figurinhas que eu tenho para ele */}
                   <div style={{ background: "rgba(245,183,0,0.04)", border: "1px solid rgba(245,183,0,0.12)", borderRadius: 16, padding: "10px 12px", marginBottom: 16 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <span style={{ fontSize: 10, fontWeight: 800, color: "var(--warning)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tenho para ele</span>
@@ -296,7 +310,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
                           const code = stickersCatalog[id] || `Fig. ${id}`;
                           return (
                             <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "3px 6px", fontSize: 10, fontWeight: 700, color: "var(--text-main)", whiteSpace: "nowrap" }}>
-                              <img src={getFlagUrl(code)} style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
+                              <img src={getFlagUrl(code)} alt="" style={{ width: 12, height: 9, borderRadius: 1.5, objectFit: "cover" }} />
                               {code}
                             </span>
                           );
@@ -323,7 +337,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
                     >
                       <PhoneCall size={14} /> Ligar para Trocar
                     </button>
-                    
+
                     <div style={{ display: "flex", gap: 8 }}>
                       <Link href={`/profile/${match.user_id}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(255,255,255,0.05)", color: "var(--text-main)", borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 600, textDecoration: "none", border: "1px solid rgba(255,255,255,0.08)", transition: "all 0.2s" }}>
                         <User size={14} /> Perfil
@@ -339,7 +353,7 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
           );
         })}
       </MapContainer>
-      
+
       <style jsx global>{`
         .leaflet-popup-content-wrapper {
           background: transparent !important;
@@ -364,8 +378,10 @@ export default function TradeMap({ matches, radius, stickersCatalog }: Props) {
           50% { transform: scale(1.25); opacity: 0.15; }
           100% { transform: scale(1.4); opacity: 0; }
         }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
     </div>
   );
 }
-

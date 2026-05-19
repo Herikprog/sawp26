@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import type { MatchResult } from "@/types";
-import { Map, MapPin, Compass } from "lucide-react";
+import { Compass, Loader2 } from "lucide-react";
+
+// Supabase instanciado uma vez fora do componente — sem leaks por re-render
+const supabase = createClient();
 
 const TradeMap = dynamic(() => import("@/components/map/TradeMap"), {
   ssr: false,
@@ -23,11 +26,19 @@ const TradeMap = dynamic(() => import("@/components/map/TradeMap"), {
 export default function MapPage() {
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [radius, setRadius] = useState<number>(20);
+  // Valor do slider em tempo real — o fetch só dispara após debounce
+  const [sliderRadius, setSliderRadius] = useState<number>(20);
   const [stickersCatalog, setStickersCatalog] = useState<Record<number, string>>({});
+  // coords: null enquanto GPS ainda não respondeu
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
-  const supabase = createClient();
+  // gpsReady: true quando GPS respondeu (sucesso ou erro) — evita fetch prematuro
+  const [gpsReady, setGpsReady] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Carregar catálogo de figurinhas para resolver os códigos no popup
+  // Ref para debounce do slider
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Carregar catálogo de figurinhas (uma vez)
   useEffect(() => {
     async function loadCatalog() {
       const { data } = await supabase.from("stickers").select("id, codigo");
@@ -40,34 +51,59 @@ export default function MapPage() {
       }
     }
     loadCatalog();
-  }, [supabase]);
-
-  // Capturar coordenadas GPS do utilizador
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        },
-        () => {
-          console.warn("GPS bloqueado no Mapa, usando fallback do perfil cadastrado.");
-          fetchNearbyMatches();
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    } else {
-      fetchNearbyMatches();
-    }
   }, []);
 
-  // Recarregar colecionadores próximos quando as coordenadas ou o raio mudarem
+  // GPS — pedido único. Só após resposta (sucesso ou erro) define gpsReady=true
   useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsReady(true);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setCoords({ lat: latitude, lon: longitude });
+        // Actualizar localização no perfil em background (separado do fetch de matches)
+        void (async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            void supabase.rpc("update_my_location", {
+              p_user_id: user.id,
+              p_lat: latitude,
+              p_lon: longitude,
+            });
+          }
+        })();
+        setGpsReady(true);
+      },
+      () => {
+        console.warn("GPS bloqueado no Mapa, usando fallback do perfil cadastrado.");
+        setGpsReady(true); // Continua sem coords — RPC usa perfil
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, []);
+
+  // Fetch de matches: só dispara quando GPS já respondeu (gpsReady) ou quando radius mudar
+  useEffect(() => {
+    if (!gpsReady) return;
     fetchNearbyMatches();
-  }, [coords, radius]);
+  }, [gpsReady, radius]);
+
+  // Debounce do slider: espera 400ms depois de parar de arrastar para actualizar radius
+  function handleSliderChange(value: number) {
+    setSliderRadius(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setRadius(value);
+    }, 400);
+  }
 
   async function fetchNearbyMatches() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    setLoading(true);
 
     const rpcParams: any = {
       p_user_id: user.id,
@@ -80,6 +116,7 @@ export default function MapPage() {
     }
 
     const { data } = await supabase.rpc("get_nearby_matches", rpcParams);
+
     if (data && data.length > 0) {
       const userIds = data.map((m: any) => m.user_id);
       const { data: locationsData } = await supabase
@@ -90,23 +127,23 @@ export default function MapPage() {
       if (locationsData) {
         const locationMap: Record<string, string> = {};
         locationsData.forEach((p: any) => {
-          if (p.location) {
-            locationMap[p.id] = p.location;
-          }
+          if (p.location) locationMap[p.id] = p.location;
         });
-
-        const enhancedMatches = data.map((m: any) => ({
-          ...m,
-          location: locationMap[m.user_id] || null
-        }));
-        setMatches(enhancedMatches);
+        setMatches(data.map((m: any) => ({ ...m, location: locationMap[m.user_id] || null })));
       } else {
         setMatches(data);
       }
     } else {
       setMatches(data || []);
     }
+
+    setLoading(false);
   }
+
+  // Centro do mapa: coords GPS se disponível, senão Lisboa como fallback
+  const mapCenter: [number, number] = coords
+    ? [coords.lat, coords.lon]
+    : [38.7223, -9.1393];
 
   return (
     <div style={{ padding: "48px 24px", height: "calc(100vh - 64px)", display: "flex", flexDirection: "column", maxWidth: 1200, margin: "0 auto", width: "100%" }}>
@@ -128,8 +165,13 @@ export default function MapPage() {
 
       {/* Map Container */}
       <div style={{ flex: 1, minHeight: 400, position: "relative", borderRadius: 32, overflow: "hidden" }}>
-        <TradeMap matches={matches} radius={radius} stickersCatalog={stickersCatalog} />
-        
+        <TradeMap
+          matches={matches}
+          radius={radius}
+          stickersCatalog={stickersCatalog}
+          center={mapCenter}
+        />
+
         {/* Painel Flutuante Interativo de Varredura */}
         <div style={{
           position: "absolute", top: 24, right: 24, zIndex: 400,
@@ -146,15 +188,15 @@ export default function MapPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 13, color: "var(--text-sec)", fontWeight: 500 }}>Distância Máxima:</span>
-              <span style={{ fontSize: 15, color: "var(--primary)", fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif" }}>{radius} km</span>
+              <span style={{ fontSize: 15, color: "var(--primary)", fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif" }}>{sliderRadius} km</span>
             </div>
-            <input 
-              type="range" 
-              min="5" 
-              max="100" 
+            <input
+              type="range"
+              min="5"
+              max="100"
               step="5"
-              value={radius} 
-              onChange={(e) => setRadius(parseInt(e.target.value))} 
+              value={sliderRadius}
+              onChange={(e) => handleSliderChange(parseInt(e.target.value))}
               style={{
                 width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.15)",
                 outline: "none", cursor: "pointer", accentColor: "var(--primary)", transition: "all 0.2s"
@@ -163,8 +205,14 @@ export default function MapPage() {
           </div>
 
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 10px #00C96D" }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>{matches.length} Colecionadores Próximos</span>
+            {loading ? (
+              <Loader2 size={14} style={{ color: "var(--primary)", flexShrink: 0, animation: "spin 1s linear infinite" }} />
+            ) : (
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 10px #00C96D", flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
+              {loading ? "A procurar..." : `${matches.length} Colecionadores Próximos`}
+            </span>
           </div>
         </div>
       </div>
