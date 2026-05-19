@@ -596,3 +596,96 @@ button, a {
   border-radius: 0 4px 4px 0;
   background: var(--gradient-primary);
 }
+
+/* ==========================================================================
+   AUDITORIA SENIOR DE UX/UI MOBILE & PERFORMANCE - SWAP26 NATIVE PREMIUM
+   ========================================================================== */
+
+/* 1. Responsividade Radical & Prevenção de Transbordo (Overflow-X) */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+
+/* Forçar empilhamento inteligente de grids complexos no mobile */
+@media (max-width: 767px) {
+  .responsive-grid-1fr {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .responsive-flex-column {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+}
+
+/* 2. Engenharia Tátil Ergonómica (Regra dos 44px-48px) */
+@media (max-width: 767px) {
+  /* Alvos mínimos de toque táteis para botões normais e links em ecrãs móveis */
+  button, a {
+    min-height: 44px; /* Hitbox recomendada pela Apple Human Interface Guidelines */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Hitbox Ergonómica Invisível (para ícones pequenos de 20-30px manterem o visual elegante mas com toque de 48px) */
+.btn-touch-target {
+  position: relative;
+}
+.btn-touch-target::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  cursor: pointer;
+  z-index: 5;
+}
+
+/* 3. Prevenção de Zoom Automático (Safari iOS) & Feedback Tátil Nativo */
+@media (max-width: 767px) {
+  /* Forçar tamanho de fonte seguro para inputs e seleções para evitar o zoom forçado do Safari */
+  input, textarea, select, .input-dark {
+    font-size: 16px !important;
+  }
+}
+
+/* Feedback táteis premium (anti-hover persistente no mobile, toque de escala nativa) */
+@media (hover: hover) {
+  /* Hover ativo apenas em dispositivos que o suportam */
+  .card-interactive:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary);
+  }
+}
+
+/* Efeito de Toque Ativo (Feedback Tátil Instantâneo com aceleração de GPU) */
+.btn-active-scale:active,
+button:active:not(:disabled),
+a:active:not(.no-active-scale) {
+  transform: scale(0.96) !important;
+  opacity: 0.9 !important;
+  transition: transform 0.05s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.05s ease !important;
+}
+
+/* 4. Aceleração por Hardware (GPU) & Rolamento Suave */
+.gpu-accelerated {
+  backface-visibility: hidden;
+  perspective: 1000;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Rolamento nativo inercial ultra-fluido em iOS */
+.scroll-momentum {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+

@@ -173,15 +173,18 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Pesquisar por jogador, seleção ou código..."
+                autoComplete="off"
+                autoCorrect="off"
                 style={{
                   width: "100%", background: "var(--input-bg)", border: "1px solid var(--border-color)",
-                  borderRadius: 12, padding: "12px 40px 12px 42px", color: "var(--text-main)", fontSize: 13, outline: "none",
+                  borderRadius: 12, padding: "12px 40px 12px 42px", color: "var(--text-main)", fontSize: 16, outline: "none",
                   transition: "all 0.25s ease",
                 }}
               />
               {search && (
                 <button
                   onClick={() => setSearch("")}
+                  className="btn-touch-target btn-active-scale"
                   style={{
                     position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
                     background: "var(--bg-hover-strong)", border: "none", color: "var(--text-muted)", cursor: "pointer",
@@ -201,8 +204,9 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
                 <button
                   key={filter}
                   onClick={() => setActiveFilter(filter as any)}
+                  className="btn-active-scale"
                   style={{
-                    padding: "6px 14px", borderRadius: 100, fontSize: 11, fontWeight: 700,
+                    padding: "8px 16px", borderRadius: 100, fontSize: 11, fontWeight: 700,
                     background: activeFilter === filter ? "var(--gradient-primary)" : "var(--bg-hover-strong)",
                     color: activeFilter === filter ? "#fff" : "var(--text-muted)",
                     border: activeFilter === filter ? "none" : "1px solid var(--border-light)",
@@ -219,6 +223,7 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
         {!readOnly && (
           <button
             onClick={() => setIsEditMode(!isEditMode)}
+            className="btn-active-scale"
             style={{
               display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", borderRadius: 12,
               background: isEditMode ? "var(--gradient-success)" : "var(--bg-hover-strong)",

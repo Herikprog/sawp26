@@ -969,13 +969,17 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                     placeholder="Código (Ex: BRA-1)"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                    style={{ flex: 1, background: "var(--input-bg)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "6px 10px", color: "var(--text-main)", fontSize: 12, outline: "none" }}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="characters"
+                    style={{ flex: 1, background: "var(--input-bg)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 12px", color: "var(--text-main)", fontSize: 16, outline: "none" }}
                   />
                   <button
                     onClick={() => addStickerToOffer(manualCode)}
-                    style={{ background: "var(--primary)", border: "none", color: "#fff", width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                    className="btn-touch-target"
+                    style={{ background: "var(--primary)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
                   >
-                    <Plus size={14} />
+                    <Plus size={16} />
                   </button>
                 </div>
 
@@ -1258,13 +1262,15 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
               value={input}
               onChange={(e) => handleTyping(e.target.value)}
               placeholder="Mensagem ou /troca..."
+              autoComplete="off"
+              autoCorrect="on"
+              rows={1}
               style={{
                 width: "100%", background: "transparent", border: "none",
-                color: "var(--text-main)", fontSize: 15, padding: "12px 0",
+                color: "var(--text-main)", fontSize: 16, padding: "12px 0",
                 outline: "none", resize: "none", maxHeight: 120,
                 fontFamily: "inherit"
               }}
-              rows={1}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();

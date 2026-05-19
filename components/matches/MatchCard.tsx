@@ -217,6 +217,7 @@ export default function MatchCard({ match, myUserId, index }: Props) {
           <button
             onClick={startDirectTradeCall}
             disabled={loadingCall}
+            className="btn-active-scale"
             style={{
               width: "100%", padding: "14px", borderRadius: 14,
               background: "linear-gradient(135deg, #f5b700 0%, #e0a300 100%)", color: "#1A1100", fontWeight: 800,
@@ -245,6 +246,7 @@ export default function MatchCard({ match, myUserId, index }: Props) {
           {/* Primary Action: Chat */}
           <button
             onClick={openChat}
+            className="btn-active-scale"
             style={{
               width: "100%", padding: "14px", borderRadius: 14,
               background: "var(--gradient-primary)", color: "#fff", fontWeight: 700,
@@ -271,6 +273,7 @@ export default function MatchCard({ match, myUserId, index }: Props) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <Link
               href={`/profile/${match.user_id}`}
+              className="btn-active-scale"
               style={{
                 padding: "12px", borderRadius: 12,
                 background: "var(--input-bg)", color: "var(--text-main)", fontWeight: 600,
@@ -293,6 +296,7 @@ export default function MatchCard({ match, myUserId, index }: Props) {
             </Link>
             <Link
               href={`/profile/${match.user_id}#album`}
+              className="btn-active-scale"
               style={{
                 padding: "12px", borderRadius: 12,
                 background: "var(--input-bg)", color: "var(--text-main)", fontWeight: 600,

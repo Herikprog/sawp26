@@ -328,21 +328,22 @@ export default function TradeMap({ matches, radius, stickersCatalog, center }: P
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <button
                       onClick={() => startDirectTradeCall(match)}
+                      className="btn-active-scale"
                       style={{
                         width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                         background: "linear-gradient(135deg, #f5b700 0%, #e0a300 100%)", color: "#1A1100",
-                        borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 800, border: "none", cursor: "pointer",
-                        boxShadow: "0 8px 20px rgba(245,183,0,0.2)", transition: "all 0.2s"
+                        borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 800, border: "none", cursor: "pointer",
+                        boxShadow: "0 8px 20px rgba(245,183,0,0.25)", transition: "all 0.2s"
                       }}
                     >
                       <PhoneCall size={14} /> Ligar para Trocar
                     </button>
 
                     <div style={{ display: "flex", gap: 8 }}>
-                      <Link href={`/profile/${match.user_id}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(255,255,255,0.05)", color: "var(--text-main)", borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 600, textDecoration: "none", border: "1px solid rgba(255,255,255,0.08)", transition: "all 0.2s" }}>
+                      <Link href={`/profile/${match.user_id}`} className="btn-active-scale" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(255,255,255,0.05)", color: "var(--text-main)", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 600, textDecoration: "none", border: "1px solid rgba(255,255,255,0.08)", transition: "all 0.2s" }}>
                         <User size={14} /> Perfil
                       </Link>
-                      <Link href={`/api/chat/start?userId=${match.user_id}`} style={{ flex: 1.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--primary)", color: "var(--text-main)", borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", textDecoration: "none", boxShadow: "0 8px 20px rgba(0,174,239,0.25)", transition: "all 0.2s" }}>
+                      <Link href={`/api/chat/start?userId=${match.user_id}`} className="btn-active-scale" style={{ flex: 1.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--primary)", color: "var(--text-main)", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", textDecoration: "none", boxShadow: "0 8px 20px rgba(0,174,239,0.25)", transition: "all 0.2s" }}>
                         <MessageCircle size={14} /> Negociar
                       </Link>
                     </div>
