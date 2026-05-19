@@ -174,7 +174,7 @@ export default async function PublicProfilePage({ params }: Props) {
               <MessageCircle size={18} /> Iniciar Chat
             </Link>
             <TradeCallButton targetUserId={id} />
-            <ReportButton />
+            <ReportButton reportedId={id} reportedName={profile?.nome || "Utilizador"} />
           </div>
         </div>
       </div>

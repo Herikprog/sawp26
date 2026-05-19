@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import ReportModal from "@/components/profile/ReportModal";
 
 interface Props {
   conversationId: string;
@@ -58,6 +59,20 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
   const [manualCode, setManualCode] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fechar dropdown de opções ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -510,6 +525,30 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
     toast.error("Troca cancelada.");
   }
 
+  async function clearConversation() {
+    if (!window.confirm("Tem a certeza de que deseja limpar todas as mensagens desta conversa? Esta ação é irreversível.")) {
+      return;
+    }
+
+    try {
+      // 1. Excluir mensagens da conversa na tabela `messages` no Supabase
+      const { error } = await supabase
+        .from("messages")
+        .delete()
+        .eq("conversation_id", conversationId);
+
+      if (error) throw error;
+
+      // 2. Limpar o estado local instantaneamente
+      setMessages([]);
+      toast.success("Conversa limpa com sucesso!");
+      setIsMoreMenuOpen(false);
+    } catch (err: any) {
+      console.error("Erro ao limpar conversa:", err);
+      toast.error(`Falha ao limpar conversa: ${err.message || "Erro desconhecido"}`);
+    }
+  }
+
   function broadcastOffers(myOffersList: TradeOffer[], acceptedStatus: boolean) {
     if (channelRef.current) {
       channelRef.current.send({
@@ -868,12 +907,70 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             {!isMobile && "Propor Troca"}
           </button>
           
-          <button style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: 8, cursor: "pointer" }}>
+          {/* Botão de Denúncia (i) */}
+          <button 
+            onClick={() => setIsReportModalOpen(true)}
+            style={{ 
+              background: "transparent", border: "none", color: "var(--text-muted)", 
+              padding: 8, cursor: "pointer", borderRadius: "50%", display: "flex", 
+              alignItems: "center", justifyContent: "center", transition: "all 0.2s ease" 
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--text-main)"}
+            onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
+            title="Denunciar Utilizador"
+          >
             <Info size={20} />
           </button>
-          <button style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: 8, cursor: "pointer" }}>
-            <MoreHorizontal size={20} />
-          </button>
+
+          {/* Botão de Mais Opções (...) */}
+          <div ref={moreMenuRef} style={{ position: "relative" }}>
+            <button 
+              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+              style={{ 
+                background: "transparent", border: "none", color: "var(--text-muted)", 
+                padding: 8, cursor: "pointer", borderRadius: "50%", display: "flex", 
+                alignItems: "center", justifyContent: "center", transition: "all 0.2s ease" 
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = "var(--text-main)"}
+              onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
+            >
+              <MoreHorizontal size={20} />
+            </button>
+
+            {/* Dropdown Menu de Mais Opções */}
+            <AnimatePresence>
+              {isMoreMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  transition={{ duration: 0.15 }}
+                  style={{
+                    position: "absolute", top: 40, right: 0, zIndex: 100,
+                    width: 180, background: "rgba(10, 25, 47, 0.98)",
+                    backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 16, boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+                    padding: 6, display: "flex", flexDirection: "column"
+                  }}
+                >
+                  <button
+                    onClick={clearConversation}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 14px", background: "transparent", border: "none",
+                      color: "#ff4d6a", fontSize: 13, fontWeight: 600, borderRadius: 12,
+                      cursor: "pointer", textAlign: "left", transition: "background 0.2s"
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255, 77, 106, 0.1)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <Trash2 size={15} />
+                    Limpar Conversa
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -1323,6 +1420,14 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
           to { opacity: 1; transform: scale(1.1); }
         }
       `}</style>
+
+      {/* Modal Reutilizável de Denúncias Profissional */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportedId={otherUser.id}
+        reportedName={otherUser.nome}
+      />
     </div>
   );
 }
