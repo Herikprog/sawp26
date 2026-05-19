@@ -3,20 +3,23 @@ import { Users, Crown, TrendingUp, FileText, Bell, ShieldAlert } from "lucide-re
 
 async function getStats() {
   const supabase = await createAdminClient();
+  if (!supabase) {
+    return { totalUsers: 0, premiumUsers: 0, openTickets: 0, bannedUsers: 0, recentUsers: [], dailySignups: null };
+  }
 
-  const [
-    { count: totalUsers },
-    { count: premiumUsers },
-    { count: openTickets },
-    { count: bannedUsers },
-    { data: recentUsers },
-  ] = await Promise.all([
+  const results = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "premium"),
     supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "open"),
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("is_banned", true),
     supabase.from("profiles").select("id, nome, plano, created_at, cidade").order("created_at", { ascending: false }).limit(10),
   ]);
+
+  const totalUsers = results[0]?.count ?? 0;
+  const premiumUsers = results[1]?.count ?? 0;
+  const openTickets = results[2]?.count ?? 0;
+  const bannedUsers = results[3]?.count ?? 0;
+  const recentUsers = results[4]?.data ?? [];
 
   // Registos por dia nos últimos 14 dias
   let dailySignups = null;
@@ -146,7 +149,7 @@ export default async function AdminDashboard() {
                   {user.plano}
                 </span>
                 <span style={{ fontSize: 11, color: "#555" }}>
-                  {new Date(user.created_at).toLocaleDateString("pt-PT")}
+                  {user.created_at ? new Date(user.created_at).toLocaleDateString("pt-PT") : "—"}
                 </span>
               </div>
             </div>

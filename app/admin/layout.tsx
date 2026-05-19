@@ -7,17 +7,23 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin, nome")
-    .eq("id", user.id)
-    .single();
+  let profile = null;
+  try {
+    const res = await supabase
+      .from("profiles")
+      .select("is_admin, nome")
+      .eq("id", user.id)
+      .single();
+    profile = res.data;
+  } catch (err) {
+    // Ignore error
+  }
 
-  const isEmailAdmin = user.email === "bragawork01@gmail.com";
+  const isEmailAdmin = user?.email === "bragawork01@gmail.com";
 
   if (!isEmailAdmin && !profile?.is_admin) {
     // Retornar 404 para esconder a rota
