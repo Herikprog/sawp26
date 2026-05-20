@@ -82,13 +82,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Sem assinatura → redirecionar para página premium (paywall)
-  if (!profile || profile.plano !== "premium") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/premium";
-    url.searchParams.set("paywall", "1");
-    return NextResponse.redirect(url);
-  }
+  // Allow free users to access the page (contents will be obfuscated at the component level)
 
   return response;
 }

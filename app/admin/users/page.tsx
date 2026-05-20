@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Ban, Clock, Crown, Shield, Trash2, ChevronDown, X } from "lucide-react";
+import { Search, Ban, Clock, Crown, Shield, Trash2, ChevronDown, X, Users } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface User {
@@ -74,6 +74,31 @@ export default function AdminUsersPage() {
       setSelectedUser(null);
     } catch (err: any) {
       toast.error(err.message || "Erro ao apagar conta.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function impersonateUser(userId: string) {
+    if (!confirm("Deseja mesmo entrar na conta deste utilizador? A sua sessão administrativa atual será substituída pela dele.")) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "impersonate", userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      toast.success("Redirecionando...");
+      if (data.action_link) {
+        window.location.href = data.action_link;
+      } else {
+        throw new Error("Link não gerado pela API.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao tentar entrar na conta do utilizador.");
     } finally {
       setActionLoading(false);
     }
@@ -220,6 +245,12 @@ export default function AdminUsersPage() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Impersonate */}
+              <button onClick={() => impersonateUser(selectedUser.id)} disabled={actionLoading}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: 12, color: "#a78bfa", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                <Users size={16} /> Entrar na Conta
+              </button>
+
               {/* Premium */}
               <button onClick={() => doAction("set_premium", selectedUser.id)} disabled={actionLoading}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, color: "#fbbf24", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>

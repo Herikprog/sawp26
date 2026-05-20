@@ -4,6 +4,7 @@ import FeedInput from "@/components/feed/FeedInput";
 import FeedList from "@/components/feed/FeedList";
 import FeedHeader from "@/components/feed/FeedHeader";
 import type { Post } from "@/types";
+import PremiumPaywallOverlay from "@/components/PremiumPaywallOverlay";
 
 export const revalidate = 0;
 
@@ -46,20 +47,31 @@ export default async function FeedPage() {
   }
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px 100px" }}>
-      <FeedHeader />
+    <PremiumPaywallOverlay
+      pageName="Feed da Comunidade"
+      explanation="Partilha mensagens, fotos, figurinhas repetidas e novidades com toda a comunidade de colecionadores em tempo real!"
+      benefits={[
+        "Publicação de mensagens e imagens na rede social",
+        "Interação com posts através de likes e comentários",
+        "Divulgação rápida de figurinhas repetidas para trocas",
+        "Atualizações dinâmicas e notificações instantâneas"
+      ]}
+    >
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px 100px" }}>
+        <FeedHeader />
 
-      {/* Input */}
-      <div style={{ borderBottom: "1px solid var(--border-color)", marginBottom: 8 }}>
-        <FeedInput userProfile={profile} />
+        {/* Input */}
+        <div style={{ borderBottom: "1px solid var(--border-color)", marginBottom: 8 }}>
+          <FeedInput userProfile={profile} />
+        </div>
+
+        {/* Feed */}
+        <FeedList
+          initialPosts={(posts || []) as Post[]}
+          currentUserId={user.id}
+          currentUserProfile={profile}
+        />
       </div>
-
-      {/* Feed */}
-      <FeedList
-        initialPosts={(posts || []) as Post[]}
-        currentUserId={user.id}
-        currentUserProfile={profile}
-      />
-    </div>
+    </PremiumPaywallOverlay>
   );
 }

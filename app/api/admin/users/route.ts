@@ -5,9 +5,10 @@ async function verifyAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+  const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
   const admin = await createAdminClient();
   const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!profile?.is_admin) return null;
+  if (!isEmailAdmin && !profile?.is_admin) return null;
   return { user, admin };
 }
 
@@ -43,6 +44,43 @@ export async function PATCH(request: Request) {
   const { action, userId, days } = await request.json();
   const admin = ctx.admin;
   const adminId = ctx.user.id;
+
+  if (action === "impersonate") {
+    try {
+      const { data: targetUser, error: userError } = await admin.auth.admin.getUserById(userId);
+      if (userError || !targetUser.user?.email) {
+        return NextResponse.json({ error: "Utilizador não encontrado ou sem email de login." }, { status: 400 });
+      }
+      
+      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: targetUser.user.email,
+        options: {
+          redirectTo: `${new URL(request.url).origin}/auth/callback?next=/dashboard`
+        }
+      });
+      
+      if (linkError) {
+        return NextResponse.json({ error: linkError.message }, { status: 500 });
+      }
+      
+      // Registar no audit log
+      await admin.from("admin_audit_log").insert({
+        admin_id: adminId,
+        action: "impersonate",
+        target_user: userId,
+        metadata: { target_email: targetUser.user.email }
+      });
+      
+      return NextResponse.json({
+        success: true,
+        message: "Link de personificação gerado com sucesso.",
+        action_link: linkData.properties.action_link
+      });
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message || "Erro ao gerar link de acesso." }, { status: 500 });
+    }
+  }
 
   let update: any = {};
   let logAction = action;

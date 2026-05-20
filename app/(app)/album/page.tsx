@@ -4,6 +4,8 @@ import AlbumGrid from "@/components/album/AlbumGrid";
 import ProgressBar from "@/components/album/ProgressBar";
 import type { AlbumStats } from "@/types";
 
+import PremiumPaywallOverlay from "@/components/PremiumPaywallOverlay";
+
 export default async function AlbumPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -26,12 +28,23 @@ export default async function AlbumPage() {
   }, {});
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "64px 24px" }}>
-      {/* ─── Grid Section ─── */}
-      <AlbumGrid 
-        stickers={stickers || []} 
-        userStickers={userStickersMap} 
-      />
-    </div>
+    <PremiumPaywallOverlay
+      pageName="Caderneta Virtual de Figurinhas"
+      explanation="Regista, controla e organiza a tua coleção de figurinhas completa! Acompanha o teu progresso em tempo real e descobre o que te falta para fechar o álbum."
+      benefits={[
+        "Controle completo das figurinhas coladas e repetidas",
+        "Estatísticas de progresso detalhadas por grupo/seleção",
+        "Identificação automática de cromos em falta",
+        "Sincronização imediata para propostas de match"
+      ]}
+    >
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "64px 24px" }}>
+        {/* ─── Grid Section ─── */}
+        <AlbumGrid 
+          stickers={stickers || []} 
+          userStickers={userStickersMap} 
+        />
+      </div>
+    </PremiumPaywallOverlay>
   );
 }

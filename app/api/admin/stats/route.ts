@@ -5,9 +5,10 @@ async function verifyAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+  const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
   const admin = await createAdminClient();
   const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!profile?.is_admin) return null;
+  if (!isEmailAdmin && !profile?.is_admin) return null;
   return { user, admin };
 }
 

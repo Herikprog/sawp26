@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { Check, Zap, Shield, Crown, Star, ArrowRight } from "lucide-react";
 
 const FEATURES = [
-  { icon: Zap, text: "Raio de busca de 50km (vs 10km gratuito)" },
+  { icon: Zap, text: "Raio de busca estendido de 50km" },
   { icon: Shield, text: "Prioridade máxima nos resultados de match" },
   { icon: Crown, text: "Badge dourado exclusivo no perfil" },
   { icon: Star, text: "Acesso antecipado a novas funcionalidades" },
@@ -56,44 +56,9 @@ export default function PremiumPage() {
       </div>
 
       {/* Plans Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
-        {/* Free Plan */}
-        <div style={{
-          background: "var(--card-bg)", borderRadius: 28,
-          border: "1px solid rgba(255,255,255,0.08)",
-          padding: "48px 36px", opacity: 0.7,
-        }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text-sec)", marginBottom: 8 }}>Explorador</p>
-          <p style={{ fontSize: 36, fontWeight: 800, color: "var(--text-main)", marginBottom: 32, fontFamily: "'Space Grotesk', sans-serif" }}>
-            Grátis
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 40 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Check size={16} style={{ color: "var(--success)" }} />
-              <span style={{ fontSize: 14, color: "var(--text-sec)" }}>Registo de figurinhas</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Check size={16} style={{ color: "var(--success)" }} />
-              <span style={{ fontSize: 14, color: "var(--text-sec)" }}>Matching básico (10km)</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, opacity: 0.4 }}>
-              <Check size={16} style={{ color: "var(--text-muted)" }} />
-              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>Prioridade nos matches</span>
-            </div>
-          </div>
-
-          <button disabled style={{
-            width: "100%", padding: "14px", borderRadius: 14,
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-            color: "var(--text-muted)", fontWeight: 600, fontSize: 14, cursor: "not-allowed",
-          }}>
-            Plano Atual
-          </button>
-        </div>
-
+      <div style={{ display: "flex", justifyContent: "center" }}>
         {/* Premium Plan */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", width: "100%", maxWidth: 450 }}>
           <div style={{
             position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
             background: "linear-gradient(135deg, #F5B700, #FFD95A)",
@@ -101,7 +66,7 @@ export default function PremiumPage() {
             padding: "5px 16px", borderRadius: 100,
             textTransform: "uppercase", letterSpacing: "0.15em", zIndex: 10,
           }}>
-            Recomendado
+            Acesso Total
           </div>
 
           <div style={{
