@@ -35,6 +35,14 @@ export default function RealtimeManager() {
   // ─── Atualização de Localização em Segundo Plano ───
   useEffect(() => {
     async function updateLocation() {
+      if (typeof window !== "undefined") {
+        const consent = localStorage.getItem("trocastickers_location_consent");
+        if (consent !== "true") {
+          console.log("Geolocalização pendente de consentimento explícito do utilizador.");
+          return;
+        }
+      }
+
       if (!navigator.geolocation) return;
 
       navigator.geolocation.getCurrentPosition(

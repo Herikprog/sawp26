@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { CookieBanner } from "@/components/CookieBanner";
 
 export const metadata: Metadata = {
   title: "Troca Stickers — Troca de Figurinhas da Copa do Mundo 2026",
@@ -45,6 +46,7 @@ export default function RootLayout({
               },
             }}
           />
+          <CookieBanner />
           {children}
         </ThemeProvider>
       </body>

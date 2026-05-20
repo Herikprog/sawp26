@@ -13,7 +13,14 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+  const [confirmAge, setConfirmAge] = useState(false);
+
   const supabase = createClient();
+
+  const isFormValid = acceptTerms && acceptPrivacy && confirmAge && nome && email && password.length >= 6;
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -21,21 +28,67 @@ export default function RegisterPage() {
       toast.error("A palavra-passe deve ter pelo menos 6 caracteres.");
       return;
     }
+    if (!acceptTerms || !acceptPrivacy || !confirmAge) {
+      toast.error("Deves aceitar todos os termos e políticas para registar.");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email, password,
       options: {
         data: { nome },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    setLoading(false);
-    if (error) toast.error(error.message);
-    else toast.success("Conta criada! Verifica o teu email para confirmar.");
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    } else {
+      // Gravar log de consentimento
+      try {
+        await fetch("/api/consent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            consent_type: "terms_and_privacy",
+            consented: true,
+            terms_version: "v1.0",
+            userId: data.user?.id
+          })
+        });
+      } catch (err) {
+        console.error("Erro ao guardar log de consentimento:", err);
+      }
+      setLoading(false);
+      toast.success("Conta criada! Verifica o teu email para confirmar.");
+    }
   }
 
   async function handleGoogle() {
+    if (!acceptTerms || !acceptPrivacy || !confirmAge) {
+      toast.error("Deves aceitar todos os termos e políticas antes de usar o Google.");
+      return;
+    }
+
     setLoading(true);
+    
+    // Gravar consentimento antes do redirect para o Google
+    try {
+      await fetch("/api/consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consent_type: "terms_and_privacy",
+          consented: true,
+          terms_version: "v1.0"
+        })
+      });
+    } catch (err) {
+      console.error("Erro pré-login Google consent log:", err);
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -163,12 +216,15 @@ export default function RegisterPage() {
           <div style={{
             background: "var(--card-bg)", border: "1px solid var(--border-color)",
             borderRadius: 24, padding: "36px 32px", boxShadow: "var(--shadow-xl)",
-          }}>
-            <button onClick={handleGoogle} disabled={loading} style={{
+          }}>            <button onClick={handleGoogle} disabled={loading || !(acceptTerms && acceptPrivacy && confirmAge)} style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
-              background: "var(--text-main)", color: "var(--bg-main)",
+              background: (acceptTerms && acceptPrivacy && confirmAge) ? "var(--text-main)" : "var(--border-color)",
+              color: (acceptTerms && acceptPrivacy && confirmAge) ? "var(--bg-main)" : "var(--text-muted)",
               fontWeight: 700, fontSize: 14, padding: "16px 24px", borderRadius: 14,
-              border: "none", cursor: "pointer", boxShadow: "var(--shadow-md)", marginBottom: 28,
+              border: "none", cursor: (acceptTerms && acceptPrivacy && confirmAge) ? "pointer" : "not-allowed",
+              boxShadow: (acceptTerms && acceptPrivacy && confirmAge) ? "var(--shadow-md)" : "none",
+              marginBottom: 28,
+              transition: "all 0.3s ease",
             }}>
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.07 5.07 0 0 1-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -178,7 +234,6 @@ export default function RegisterPage() {
               </svg>
               Registar com Google
             </button>
-
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
               <div style={{ height: 1, flex: 1, background: "var(--border-color)" }} />
               <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--text-muted)" }}>ou com email</span>
@@ -216,12 +271,38 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={loading} style={{
+              {/* Checkboxes de consentimento legal */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24, textAlign: "left" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)" }}>
+                  <input type="checkbox" checked={confirmAge} onChange={(e) => setConfirmAge(e.target.checked)}
+                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)" }}
+                  />
+                  <span>Confirmo que tenho <strong>16 anos ou mais</strong> (exigência de idade mínima legal).</span>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)" }}>
+                  <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)}
+                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)" }}
+                  />
+                  <span>Li e aceito os <Link href="/termos" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Termos e Condições</Link> de serviço.</span>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)" }}>
+                  <input type="checkbox" checked={acceptPrivacy} onChange={(e) => setAcceptPrivacy(e.target.checked)}
+                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)" }}
+                  />
+                  <span>Li e aceito a <Link href="/privacidade" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Política de Privacidade</Link>.</span>
+                </label>
+              </div>
+
+              <button type="submit" disabled={loading || !isFormValid} style={{
                 width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                background: "var(--gradient-success)", color: "#fff",
+                background: isFormValid ? "var(--gradient-success)" : "var(--border-color)", 
+                color: isFormValid ? "#fff" : "var(--text-muted)",
                 fontWeight: 700, fontSize: 15, padding: "16px 24px", borderRadius: 14,
-                border: "none", cursor: "pointer",
-                boxShadow: "0 8px 24px -4px rgba(0,214,143,0.3)",
+                border: "none", cursor: isFormValid ? "pointer" : "not-allowed",
+                boxShadow: isFormValid ? "0 8px 24px -4px rgba(0,214,143,0.3)" : "none",
+                transition: "all 0.3s ease",
               }}>
                 {loading ? "A criar conta..." : "Criar Conta Grátis"}
                 <ArrowRight size={16} />

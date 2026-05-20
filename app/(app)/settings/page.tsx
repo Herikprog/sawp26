@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Lock, Moon, Sun, Smartphone, ChevronRight, LogOut, Users, Shield, Globe, Settings as SettingsIcon } from "lucide-react";
+import { Bell, Lock, Moon, Sun, Smartphone, ChevronRight, LogOut, Users, Shield, Globe, Settings as SettingsIcon, MapPin, Download, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -16,15 +16,20 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [publicProfile, setPublicProfile] = useState(true);
+  const [locationConsent, setLocationConsent] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     // Load simulated preferences from localStorage
     const savedNotifs = localStorage.getItem("trocastickers_notifs");
     const savedPublic = localStorage.getItem("trocastickers_public");
+    const savedLocation = localStorage.getItem("trocastickers_location_consent");
     
     if (savedNotifs !== null) setNotifications(savedNotifs === "true");
     if (savedPublic !== null) setPublicProfile(savedPublic === "true");
+    if (savedLocation !== null) setLocationConsent(savedLocation === "true");
   }, []);
 
   async function handleLogout() {
@@ -66,6 +71,71 @@ export default function SettingsPage() {
 
   function handleInstallApp() {
     toast.success("Instruções de instalação PWA abertas (Simulação)", { icon: "📱" });
+  }
+
+  async function toggleLocationConsent() {
+    const next = !locationConsent;
+    setLocationConsent(next);
+    localStorage.setItem("trocastickers_location_consent", String(next));
+    toast.success(next ? "Geolocalização ativada!" : "Geolocalização desativada!", { icon: next ? "📍" : "🚫" });
+  }
+
+  async function handleExportData() {
+    try {
+      setExporting(true);
+      toast.loading("A preparar a exportação dos teus dados...", { id: "export" });
+      const res = await fetch("/api/user/export-data");
+      
+      if (!res.ok) {
+        throw new Error("Falha ao exportar os dados.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      
+      const disposition = res.headers.get('Content-Disposition');
+      let filename = "dados_pessoais.json";
+      if (disposition && disposition.indexOf('filename=') !== -1) {
+          const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+          if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
+      }
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Dados exportados com sucesso!", { id: "export" });
+    } catch (err: any) {
+      toast.error(err.message, { id: "export" });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!confirm("⚠️ ATENÇÃO: Esta ação é irreversível. Todos os teus dados, figurinhas e mensagens serão eliminados permanentemente. Queres mesmo apagar a tua conta?")) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      toast.loading("A apagar a conta...", { id: "delete" });
+      const res = await fetch("/api/user/delete-account", { method: "POST" });
+      
+      if (!res.ok) {
+        throw new Error("Falha ao apagar conta.");
+      }
+
+      toast.success("Conta eliminada com sucesso.", { id: "delete" });
+      await supabase.auth.signOut();
+      window.location.href = "/register";
+    } catch (err: any) {
+      toast.error(err.message, { id: "delete" });
+      setDeleting(false);
+    }
   }
 
   function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
@@ -230,22 +300,39 @@ export default function SettingsPage() {
           />
         </SectionCard>
 
-        {/* ─── Privacidade ─── */}
-        <SectionCard title="Privacidade e Segurança">
+        {/* ─── Privacidade e Segurança (Conformidade GDPR / LGPD) ─── */}
+        <SectionCard title="Privacidade e Dados">
           <Row
-            icon={Lock}
-            label="Privacidade"
-            desc="Controla quem pode ver a tua localização"
-            onClick={() => handleComingSoon("Privacidade")}
-            right={<ChevronRight size={14} style={{ color: "var(--text-muted)" }} />}
+            icon={MapPin}
+            label="Geolocalização"
+            desc="Permitir acesso à localização para encontros"
+            right={<Toggle value={locationConsent} onChange={toggleLocationConsent} />}
           />
           <Divider />
           <Row
-            icon={Shield}
-            label="Segurança"
-            desc="Gerir palavra-passe e sessões ativas"
-            onClick={() => handleComingSoon("Segurança")}
-            right={<ChevronRight size={14} style={{ color: "var(--text-muted)" }} />}
+            icon={Download}
+            label="Exportar os meus dados"
+            desc="Receber uma cópia JSON de todos os dados"
+            onClick={exporting ? undefined : handleExportData}
+            right={
+              <span style={{ fontSize: 13, color: "var(--primary)", fontWeight: 700 }}>
+                {exporting ? "A processar..." : "Descarregar"}
+              </span>
+            }
+          />
+          <Divider />
+          <Row
+            icon={Trash2}
+            label="Apagar conta"
+            desc="Eliminação permanente e irreversível"
+            iconColor="var(--danger)"
+            iconBg="var(--danger-light)"
+            onClick={deleting ? undefined : handleDeleteAccount}
+            right={
+              <span style={{ fontSize: 13, color: "var(--danger)", fontWeight: 700 }}>
+                {deleting ? "A apagar..." : "Apagar"}
+              </span>
+            }
           />
         </SectionCard>
 
