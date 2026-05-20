@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-  const admin = await createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!isEmailAdmin && !profile?.is_admin) return null;
-  return { user, admin };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
+    const admin = await createAdminClient();
+    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+    if (!isEmailAdmin && !profile?.is_admin) return null;
+    return { user, admin };
+  } catch (err: any) {
+    console.error("[verifyAdmin] error:", err.message);
+    return null;
+  }
 }
 
 export async function GET() {

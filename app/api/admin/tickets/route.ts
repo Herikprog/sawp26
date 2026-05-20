@@ -2,17 +2,22 @@ import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-  const admin = await createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!isEmailAdmin && !profile?.is_admin) return null;
-  return { user, admin };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
+    const admin = await createAdminClient();
+    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+    if (!isEmailAdmin && !profile?.is_admin) return null;
+    return { user, admin };
+  } catch (err: any) {
+    console.error("[verifyAdmin] error:", err.message);
+    return null;
+  }
 }
 
-// GET — listar tickets
+// GET — listar tickets + denúncias (support_tickets + user_reports unificados)
 export async function GET(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -20,14 +25,46 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || "open";
 
-  const { data: tickets, error } = await ctx.admin
+  // 1. Buscar support_tickets (origem: página de suporte)
+  const { data: tickets, error: ticketError } = await ctx.admin
     .from("support_tickets")
     .select("*, profiles(nome, cidade, plano)")
     .eq("status", status)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ tickets });
+  if (ticketError) return NextResponse.json({ error: ticketError.message }, { status: 500 });
+
+  // 2. Buscar user_reports (origem: botão Denunciar no perfil/chat) — apenas se status === "open"
+  let mappedReports: any[] = [];
+  if (status === "open") {
+    const { data: reports } = await ctx.admin
+      .from("user_reports")
+      .select("*, reporter:profiles!user_reports_reporter_id_fkey(nome, cidade, plano), reported:profiles!user_reports_reported_id_fkey(nome)")
+      .order("created_at", { ascending: false });
+
+    // Mapear user_reports para o mesmo formato de support_tickets
+    if (reports) {
+      mappedReports = reports.map((r: any) => ({
+        id: `report_${r.id}`,
+        user_id: r.reporter_id,
+        type: "report",
+        subject: `Denúncia: ${r.reason.replace(/_/g, " ")} → ${r.reported?.nome || "Desconhecido"}`,
+        message: r.details || "(Sem detalhes adicionais)",
+        status: "open",
+        admin_reply: null,
+        created_at: r.created_at,
+        profiles: r.reporter || { nome: "Desconhecido", cidade: "", plano: "free" },
+        _source: "user_reports",
+        _raw_id: r.id,
+        _reported_name: r.reported?.nome,
+      }));
+    }
+  }
+
+  // Unir as duas fontes (tickets nativos primeiro, depois reports do botão)
+  const allTickets = [...(tickets || []), ...mappedReports];
+
+  return NextResponse.json({ tickets: allTickets });
 }
 
 // PATCH — responder ou fechar ticket
@@ -36,6 +73,22 @@ export async function PATCH(request: Request) {
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const { id, admin_reply, user_id, status } = await request.json();
+
+  // Se for um report do botão de denúncia (id começa com "report_"), ignorar update na tabela support_tickets
+  if (String(id).startsWith("report_")) {
+    // Apenas notificar — não temos tabela de reply para user_reports
+    if (admin_reply && user_id) {
+      try {
+        await ctx.admin.from("social_notifications").insert({
+          user_id,
+          actor_id: ctx.user.id,
+          type: "admin_reply",
+          content: `A tua denúncia foi analisada pelo administrador: "${admin_reply.substring(0, 120)}${admin_reply.length > 120 ? "..." : ""}"`,
+        });
+      } catch (_) {}
+    }
+    return NextResponse.json({ success: true, message: "Resposta registada." });
+  }
 
   const updatePayload: any = {
     updated_at: new Date().toISOString(),
@@ -58,7 +111,7 @@ export async function PATCH(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Se tiver resposta, notificar o utilizador via social_notifications
+  // Notificar o utilizador via social_notifications
   if (admin_reply && user_id) {
     try {
       await ctx.admin.from("social_notifications").insert({
@@ -67,15 +120,13 @@ export async function PATCH(request: Request) {
         type: "admin_reply",
         content: `A tua mensagem de suporte foi respondida pelo administrador: "${admin_reply.substring(0, 100)}${admin_reply.length > 100 ? "..." : ""}"`,
       });
-    } catch (err) {
-      // não bloquear se falhar
-    }
+    } catch (_) {}
   }
 
   return NextResponse.json({ success: true, message: "Ticket atualizado com sucesso." });
 }
 
-// POST — utilizador criar ticket (não precisa de ser admin)
+// POST — utilizador criar ticket de suporte (não precisa ser admin)
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

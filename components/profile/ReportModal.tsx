@@ -51,6 +51,7 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName 
         return;
       }
 
+      // 1. Guardar na tabela user_reports (origem original)
       const { error } = await supabase
         .from("user_reports")
         .insert({
@@ -61,6 +62,21 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName 
         });
 
       if (error) throw error;
+
+      // 2. Criar ticket de suporte do tipo "report" para aparecer no painel admin
+      try {
+        await fetch("/api/admin/tickets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "report",
+            subject: `Denúncia contra utilizador: ${reportedName} — Motivo: ${reason.replace(/_/g, " ")}`,
+            message: `Utilizador denunciado: ${reportedName} (ID: ${reportedId})\nMotivo: ${reason.replace(/_/g, " ")}\n\nDetalhes:\n${details.trim()}`,
+          }),
+        });
+      } catch (_) {
+        // Não bloquear se falhar — user_report já foi gravado
+      }
 
       toast.success("Denúncia enviada com sucesso! A equipa de moderação analisará o caso.");
       setReason("");

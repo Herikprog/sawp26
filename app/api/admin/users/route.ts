@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-  const admin = await createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!isEmailAdmin && !profile?.is_admin) return null;
-  return { user, admin };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
+    const admin = await createAdminClient();
+    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+    if (!isEmailAdmin && !profile?.is_admin) return null;
+    return { user, admin };
+  } catch (err: any) {
+    console.error("[verifyAdmin] error:", err.message);
+    return null;
+  }
 }
 
 // GET — listar utilizadores
@@ -124,6 +129,29 @@ export async function PATCH(request: Request) {
     target_user: userId,
     metadata: { update }
   });
+
+  // Notificar utilizador via social_notifications para ban/suspend/unban
+  const notificationContent: Record<string, string> = {
+    ban: "🚫 A tua conta foi permanentemente banida por violação das regras da plataforma.",
+    unban: "✅ O ban da tua conta foi removido. Podes voltar a aceder normalmente.",
+    set_admin: "🛡️ A tua conta foi promovida a Administrador da plataforma.",
+    set_premium: "⭐ O teu plano foi atualizado para Premium pelo administrador.",
+  };
+  const notifKey = action === "suspend" ? "suspend" : action;
+  const suspendMsg = action === "suspend"
+    ? `⏸ A tua conta foi suspensa por ${days} dia(s) por violação das regras.`
+    : null;
+  const notifContent = suspendMsg || notificationContent[notifKey];
+  if (notifContent) {
+    try {
+      await admin.from("social_notifications").insert({
+        user_id: userId,
+        actor_id: adminId,
+        type: "admin_action",
+        content: notifContent,
+      });
+    } catch (_) {}
+  }
 
   const messages: Record<string, string> = {
     ban: "Utilizador banido com sucesso.",
