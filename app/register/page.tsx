@@ -79,9 +79,9 @@ export default function RegisterPage() {
             <Image
               src="/logo.png"
               alt="Logo"
-              width={44}
-              height={44}
-              style={{ borderRadius: 10, objectFit: "contain" }}
+              width={72}
+              height={72}
+              style={{ borderRadius: 16, objectFit: "contain" }}
             />
             <span style={{
               fontFamily: "'Space Grotesk', sans-serif", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800,

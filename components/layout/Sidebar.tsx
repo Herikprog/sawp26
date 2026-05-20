@@ -89,9 +89,9 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
           <Image
             src="/logo.png"
             alt="Logo"
-            width={44}
-            height={44}
-            style={{ borderRadius: 10, objectFit: "contain" }}
+            width={54}
+            height={54}
+            style={{ borderRadius: 12, objectFit: "contain" }}
           />
           <div>
             <span style={{
@@ -312,9 +312,9 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
             <Image
               src="/logo.png"
               alt="Logo"
-              width={32}
-              height={32}
-              style={{ borderRadius: 8, objectFit: "contain" }}
+              width={40}
+              height={40}
+              style={{ borderRadius: 10, objectFit: "contain" }}
             />
             <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.04em" }}>
               Troca <span style={{ color: "var(--primary)" }}>Stickers</span>
