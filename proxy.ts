@@ -11,9 +11,10 @@ const SESSION_ONLY_ROUTES = ["/premium", "/api", "/admin"];
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Deixar passar rotas públicas e assets
+  // Deixar passar rotas públicas, assets e webhooks públicos
   if (
     (PUBLIC_ROUTES.some((r) => pathname.startsWith(r)) && !pathname.startsWith("/banned")) ||
+    pathname.startsWith("/api/stripe/webhook") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||
