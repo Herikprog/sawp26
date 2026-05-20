@@ -57,6 +57,7 @@ export default async function AdminLayout({
             { href: "/admin/users", label: "Utilizadores", icon: "👥" },
             { href: "/admin/announcements", label: "Avisos Globais", icon: "📢" },
             { href: "/admin/tickets", label: "Suporte", icon: "🎫" },
+            { href: "/admin/logs", label: "Histórico", icon: "🚫" },
           ].map((item) => (
             <a
               key={item.href}

@@ -26,7 +26,7 @@ async function verifyAdmin() {
   }
 }
 
-// GET — listar tickets + denúncias (support_tickets + user_reports unificados)
+// GET — listar tickets + denúncias (support_tickets + user_reports + post_reports unificados)
 export async function GET(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -74,8 +74,54 @@ export async function GET(request: Request) {
     }
   }
 
-  // Unir as duas fontes (tickets nativos primeiro, depois reports do botão)
-  const allTickets = [...(tickets || []), ...mappedReports];
+  // 3. Buscar post_reports (origem: denúncia de publicação no feed)
+  let mappedPostReports: any[] = [];
+  const { data: pReports } = await ctx.admin
+    .from("post_reports")
+    .select(`
+      id,
+      reporter_id,
+      post_id,
+      reason,
+      details,
+      status,
+      admin_reply,
+      created_at,
+      posts (
+        content,
+        profiles (
+          nome
+        )
+      ),
+      reporter:profiles!reporter_id (
+        nome,
+        cidade,
+        plano
+      )
+    `)
+    .eq("status", status)
+    .order("created_at", { ascending: false });
+
+  if (pReports) {
+    mappedPostReports = pReports.map((r: any) => ({
+      id: `post_report_${r.id}`,
+      user_id: r.reporter_id,
+      type: "post_report",
+      subject: `Denúncia de Post: ${r.reason} → Autor: ${r.posts?.profiles?.nome || "Desconhecido"}`,
+      message: r.details || "(Sem detalhes adicionais)",
+      status: r.status,
+      admin_reply: r.admin_reply,
+      created_at: r.created_at,
+      profiles: r.reporter || { nome: "Desconhecido", cidade: "", plano: "free" },
+      _source: "post_reports",
+      _raw_id: r.id,
+      _reported_name: r.posts?.profiles?.nome || "Desconhecido",
+      _post_content: r.posts?.content || "(Conteúdo não disponível)",
+    }));
+  }
+
+  // Unir as três fontes
+  const allTickets = [...(tickets || []), ...mappedReports, ...mappedPostReports];
 
   return NextResponse.json({ tickets: allTickets });
 }
@@ -93,7 +139,7 @@ export async function PATCH(request: Request) {
 
   // Proteger tickets/denúncias criados pelo bragawork01@gmail.com
   try {
-    if (!String(id).startsWith("report_")) {
+    if (!String(id).startsWith("report_") && !String(id).startsWith("post_report_")) {
       const { data: ticket } = await ctx.admin
         .from("support_tickets")
         .select("user_id")
@@ -113,6 +159,43 @@ export async function PATCH(request: Request) {
       }
     }
   } catch (_) {}
+
+  // Se for um post report (id começa com "post_report_")
+  if (String(id).startsWith("post_report_")) {
+    const rawId = String(id).replace("post_report_", "");
+    const updatePayload: any = {
+      replied_at: new Date().toISOString(),
+    };
+
+    if (admin_reply !== undefined) {
+      updatePayload.admin_reply = admin_reply;
+      updatePayload.status = "replied";
+    }
+
+    if (status !== undefined) {
+      updatePayload.status = status;
+    }
+
+    const { error } = await ctx.admin
+      .from("post_reports")
+      .update(updatePayload)
+      .eq("id", rawId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    if (admin_reply && user_id) {
+      try {
+        await ctx.admin.from("social_notifications").insert({
+          user_id,
+          actor_id: ctx.user.id,
+          type: "admin_reply",
+          content: `A tua denúncia de publicação foi respondida pelo administrador: "${admin_reply.substring(0, 100)}${admin_reply.length > 100 ? "..." : ""}"`,
+        });
+      } catch (_) {}
+    }
+
+    return NextResponse.json({ success: true, message: "Resposta de denúncia de post registada." });
+  }
 
   // Se for um report do botão de denúncia (id começa com "report_"), ignorar update na tabela support_tickets
   if (String(id).startsWith("report_")) {

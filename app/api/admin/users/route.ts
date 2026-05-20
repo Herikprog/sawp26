@@ -199,7 +199,6 @@ export async function PATCH(request: Request) {
     default:
       return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   }
-
   const { error } = await admin.from("profiles").update(update).eq("id", userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -222,6 +221,29 @@ export async function PATCH(request: Request) {
     }
   });
 
+  // Registar no histórico de ban/suspensão
+  if (action === "ban" || action === "suspend" || action === "unban") {
+    let actionLabel = action;
+    if (action === "suspend") {
+      actionLabel = `Suspensão (${days} dias)`;
+    } else if (action === "ban") {
+      actionLabel = "Banimento Permanente";
+    } else {
+      actionLabel = "Remoção de Ban/Suspensão";
+    }
+
+    try {
+      await admin.from("ban_suspension_logs").insert({
+        admin_id: adminId,
+        target_user_id: userId,
+        target_user_name: targetUserName || "Utilizador",
+        action: actionLabel,
+        reason: reason || (action === "unban" ? "Ban/suspensão removido pelo administrador." : "Sem motivo indicado.")
+      });
+    } catch (err: any) {
+      console.error("Erro ao gravar log de ban/suspensão:", err.message);
+    }
+  }
   // Notificar utilizador via social_notifications para ban/suspend/unban
   const notificationContent: Record<string, string> = {
     ban: "🚫 A tua conta foi permanentemente banida por violação das regras da plataforma.",

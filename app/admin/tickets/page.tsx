@@ -7,13 +7,15 @@ import toast from "react-hot-toast";
 interface Ticket {
   id: string;
   user_id: string;
-  type: "support" | "report";
+  type: "support" | "report" | "post_report";
   subject: string;
   message: string;
   status: "open" | "replied" | "closed";
   admin_reply: string | null;
   created_at: string;
   profiles: { nome: string; cidade: string; plano: string };
+  _reported_name?: string;
+  _post_content?: string;
 }
 
 const STATUS_CONFIG = {
@@ -128,11 +130,11 @@ export default function AdminTicketsPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                   <span style={{
                     fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 5,
-                    background: ticket.type === "report" ? "rgba(248,113,113,0.15)" : "rgba(74,158,255,0.1)",
-                    color: ticket.type === "report" ? "#f87171" : "#4a9eff",
+                    background: ticket.type === "post_report" ? "rgba(239,68,68,0.15)" : ticket.type === "report" ? "rgba(248,113,113,0.15)" : "rgba(74,158,255,0.1)",
+                    color: ticket.type === "post_report" ? "#ef4444" : ticket.type === "report" ? "#f87171" : "#4a9eff",
                     textTransform: "uppercase"
                   }}>
-                    {ticket.type === "report" ? "🚨 Denúncia" : "💬 Suporte"}
+                    {ticket.type === "post_report" ? "🚨 Denúncia Post" : ticket.type === "report" ? "🚨 Denúncia User" : "💬 Suporte"}
                   </span>
                   <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: cfg.bg, color: cfg.color, textTransform: "uppercase" }}>
                     {cfg.label}
@@ -169,15 +171,48 @@ export default function AdminTicketsPage() {
 
             <div style={{ marginBottom: 20 }}>
               <p style={{ fontSize: 11, color: "#4a9eff", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
-                {selected.type === "report" ? "🚨 Denúncia" : "💬 Suporte"} · {selected.profiles?.nome}
+                {selected.type === "post_report" 
+                  ? "🚨 Denúncia de Post" 
+                  : selected.type === "report" 
+                    ? "🚨 Denúncia de Utilizador" 
+                    : "💬 Suporte"} · {selected.profiles?.nome}
               </p>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{selected.subject}</h2>
             </div>
 
-            {/* Original message */}
-            <div style={{ background: "#0a0f1a", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <p style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>Mensagem do utilizador:</p>
-              <p style={{ fontSize: 14, color: "#d1d5db", lineHeight: 1.6 }}>{selected.message}</p>
+            {/* Custom Content Block */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+              {/* Autor do Report (Denunciante) */}
+              <div style={{ background: "#0a0f1a", borderRadius: 12, padding: 14 }}>
+                <span style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Reportado por (Denunciante):</span>
+                <span style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{selected.profiles?.nome || "Desconhecido"}</span>
+              </div>
+
+              {/* Utilizador Denunciado (se aplicável) */}
+              {selected._reported_name && (
+                <div style={{ background: "#0a0f1a", borderRadius: 12, padding: 14 }}>
+                  <span style={{ fontSize: 11, color: "#f87171", display: "block", marginBottom: 4 }}>Utilizador Denunciado:</span>
+                  <span style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{selected._reported_name}</span>
+                </div>
+              )}
+
+              {/* Conteúdo do Post Denunciado (se for post_report) */}
+              {selected.type === "post_report" && selected._post_content && (
+                <div style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)", borderRadius: 12, padding: 14 }}>
+                  <span style={{ fontSize: 11, color: "#ef4444", display: "block", marginBottom: 4 }}>Conteúdo do Post Denunciado:</span>
+                  <span style={{ fontSize: 13, color: "#e2e8f0", fontStyle: "italic", whiteSpace: "pre-wrap", display: "block", marginTop: 4 }}>
+                    "{selected._post_content}"
+                  </span>
+                </div>
+              )}
+
+              {/* Detalhes / Mensagem */}
+              <div style={{ background: "#0a0f1a", borderRadius: 12, padding: 14 }}>
+                <span style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>
+                  {selected.type === "support" ? "Mensagem do Suporte:" : "Detalhes da Denúncia / Motivo:"}
+                </span>
+                <span style={{ fontSize: 13, color: "#d1d5db", lineHeight: 1.5, display: "block" }}>{selected.message}</span>
+              </div>
             </div>
 
             {/* Existing reply */}

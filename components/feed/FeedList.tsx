@@ -68,12 +68,13 @@ function Avatar({ user, size = 44 }: { user?: any; size?: number }) {
 // ─── Post Card ────────────────────────────────────────────────────────────────
 function PostCard({
   post, currentUserId, allPosts,
-  onDelete, onLike, onReply, isReply = false
+  onDelete, onLike, onReply, onReport, isReply = false
 }: {
   post: Post; currentUserId: string; allPosts: Post[];
   onDelete: (id: string) => void;
   onLike: (id: string, liked: boolean) => void;
   onReply: (post: Post) => void;
+  onReport: (post: Post) => void;
   isReply?: boolean;
 }) {
   const [showMenu, setShowMenu] = useState(false);
@@ -224,7 +225,7 @@ function PostCard({
                     <MenuItem icon={<Share2 size={15} />} label={copied ? "Copiado! ✓" : "Copiar ligação"} onClick={handleCopyLink} />
                     <MenuItem icon={<Bookmark size={15} />} label="Guardar post" onClick={() => { toast("Em breve!", { icon: "⭐" }); setShowMenu(false); }} />
                     {!isOwner && (
-                      <MenuItem icon={<Flag size={15} />} label="Reportar" onClick={() => { toast("Reportado. Obrigado!", { icon: "🚩" }); setShowMenu(false); }} danger />
+                      <MenuItem icon={<Flag size={15} />} label="Reportar" onClick={() => { onReport(post); setShowMenu(false); }} danger />
                     )}
                     {isOwner && (
                       <>
@@ -377,7 +378,7 @@ function RepostModal({ post, currentUserId, onClose, onDone }: {
       >
         <h3 style={{ color: "var(--text-main)", fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Republicar?</h3>
         <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
-          O post de <strong style={{ color: "var(--text-main)" }}>{post.user?.nome}</strong> vai aparecer no teu perfil.
+          O post de <strong style={{ color: "var(--text-main)" }}>{post.user?.nome}</strong> vaia parecer no teu perfil.
         </p>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "10px 0", borderRadius: 100, border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-main)", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
@@ -385,6 +386,112 @@ function RepostModal({ post, currentUserId, onClose, onDone }: {
           </button>
           <button onClick={doRepost} disabled={loading} style={{ flex: 1, padding: "10px 0", borderRadius: 100, border: "none", background: "var(--primary)", color: "white", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontSize: 14, opacity: loading ? 0.7 : 1 }}>
             {loading ? "A republicar..." : "Republicar"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Report Modal ────────────────────────────────────────────────────────────
+function ReportModal({ post, onClose }: { post: Post; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function doReport() {
+    if (!reason.trim()) {
+      toast.error("Por favor, seleciona um motivo.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/posts/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: post.id, reason, details })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast.success("Publicação denunciada. Obrigado!", { icon: "🚩" });
+      onClose();
+    } catch (e: any) {
+      toast.error("Erro: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const reasons = [
+    "Spam / Conteúdo Irrelevante",
+    "Linguagem Ofensiva / Assédio",
+    "Conteúdo Inapropriado / Nudez",
+    "Fraude / Golpe de Troca",
+    "Outro"
+  ];
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
+    }} onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "var(--card-bg)", borderRadius: 20, padding: 24, maxWidth: 440, width: "90%",
+          border: "1px solid var(--border-color)", boxShadow: "0 40px 100px rgba(0,0,0,0.6)"
+        }}
+      >
+        <h3 style={{ color: "var(--text-main)", fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Denunciar Publicação</h3>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+          Ajuda-nos a manter a Swap26 segura. Por que razão estás a denunciar esta publicação?
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          {reasons.map((r) => (
+            <label key={r} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+              background: reason === r ? "rgba(74,158,255,0.08)" : "transparent",
+              border: `1px solid ${reason === r ? "#4a9eff" : "var(--border-color)"}`,
+              fontSize: 13, color: "var(--text-main)", fontWeight: 500,
+              transition: "all 0.2s"
+            }}>
+              <input
+                type="radio"
+                name="report_reason"
+                value={r}
+                checked={reason === r}
+                onChange={() => setReason(r)}
+                style={{ accentColor: "#4a9eff" }}
+              />
+              {r}
+            </label>
+          ))}
+        </div>
+
+        <textarea
+          placeholder="Mais detalhes (opcional)..."
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          rows={3}
+          style={{
+            width: "100%", padding: "10px 12px", background: "var(--input-bg)",
+            border: "1px solid var(--border-color)", borderRadius: 10, color: "var(--text-main)",
+            fontSize: 13, outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 20
+          }}
+        />
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px 0", borderRadius: 100, border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-main)", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+            Cancelar
+          </button>
+          <button onClick={doReport} disabled={loading || !reason} style={{ flex: 1, padding: "10px 0", borderRadius: 100, border: "none", background: "var(--danger, #ef4444)", color: "white", fontWeight: 700, cursor: (loading || !reason) ? "not-allowed" : "pointer", fontSize: 14, opacity: (loading || !reason) ? 0.7 : 1 }}>
+            {loading ? "A enviar..." : "Denunciar"}
           </button>
         </div>
       </motion.div>
@@ -419,6 +526,7 @@ export default function FeedList({
 }) {
   const [allPosts, setAllPosts] = useState<Post[]>(initialPosts);
   const [repostTarget, setRepostTarget] = useState<Post | null>(null);
+  const [reportTarget, setReportTarget] = useState<Post | null>(null);
   const supabase = createClient();
 
   const mainPosts = allPosts.filter(p => !p.parent_id && !p.repost_id)
@@ -530,6 +638,7 @@ export default function FeedList({
                   onDelete={handleDelete}
                   onLike={handleLike}
                   onReply={setRepostTarget}
+                  onReport={setReportTarget}
                 />
                 {/* Thread replies */}
                 {replies.length > 0 && (
@@ -547,6 +656,7 @@ export default function FeedList({
                         onDelete={handleDelete}
                         onLike={handleLike}
                         onReply={setRepostTarget}
+                        onReport={setReportTarget}
                         isReply
                       />
                     ))}
@@ -566,6 +676,16 @@ export default function FeedList({
             currentUserId={currentUserId}
             onClose={() => setRepostTarget(null)}
             onDone={() => setRepostTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Report Modal */}
+      <AnimatePresence>
+        {reportTarget && (
+          <ReportModal
+            post={reportTarget}
+            onClose={() => setReportTarget(null)}
           />
         )}
       </AnimatePresence>
