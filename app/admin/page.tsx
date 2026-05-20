@@ -69,7 +69,7 @@ export default async function AdminDashboard() {
           Dashboard
         </h1>
         <p style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-          Visão geral da plataforma Swap26 em tempo real.
+          Visão geral da plataforma Troca Stickers em tempo real.
         </p>
       </div>
 

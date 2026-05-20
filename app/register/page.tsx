@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { Mail, Lock, User, ArrowRight, ShieldCheck, BookOpen, MapPin, Sparkles } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function RegisterPage() {
   const [nome, setNome] = useState("");
@@ -75,17 +76,18 @@ export default function RegisterPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: "clamp(24px, 6vw, 40px)", marginTop: "clamp(40px, 10vh, 60px)" }}>
-            <div style={{
-              width: "clamp(36px, 8vw, 48px)", height: "clamp(36px, 8vw, 48px)", borderRadius: 14,
-              background: "var(--gradient-primary)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "clamp(18px, 4vw, 24px)", boxShadow: "0 12px 32px rgba(0,153,255,0.2)",
-            }}>⚽</div>
+            <Image
+              src="/logo.png"
+              alt="Logo"
+              width={44}
+              height={44}
+              style={{ borderRadius: 10, objectFit: "contain" }}
+            />
             <span style={{
               fontFamily: "'Space Grotesk', sans-serif", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800,
               color: "#F0F4FF", letterSpacing: "-0.04em",
             }}>
-              Swap<span style={{ color: "#00AEEF" }}>26</span>
+              Troca<span style={{ color: "#00AEEF" }}> Stickers</span>
             </span>
           </div>
 

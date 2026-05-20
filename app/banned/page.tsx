@@ -86,8 +86,8 @@ function BannedContent() {
 
         <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 24 }}>
           Se acreditas que foi um erro, contacta o suporte através do email{" "}
-          <a href="mailto:suporte@swap26.com" style={{ color: "#4a9eff", textDecoration: "none" }}>
-            suporte@swap26.com
+          <a href="mailto:suporte@trocastickers.com" style={{ color: "#4a9eff", textDecoration: "none" }}>
+            suporte@trocastickers.com
           </a>
         </p>
 
@@ -120,7 +120,7 @@ function BannedContent() {
 
         <div style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid #1e2736" }}>
           <p style={{ fontSize: 11, color: "#4a5568" }}>
-            Swap26 · Copa do Mundo 2026 · v2.0.0
+            Troca Stickers · Copa do Mundo 2026 · v2.0.0
           </p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 // ============================================================
-// SERVICE WORKER — SWAP26 NOTIFICAÇÕES PUSH EM SEGUNDO PLANO
+// SERVICE WORKER — TROCA STICKERS NOTIFICAÇÕES PUSH EM SEGUNDO PLANO
 // ============================================================
 
 self.addEventListener("push", function (event) {
@@ -11,7 +11,7 @@ self.addEventListener("push", function (event) {
   } catch (err) {
     // Caso o payload venha em texto simples
     payload = {
-      title: "Swap26",
+      title: "Troca Stickers",
       body: event.data.text()
     };
   }

@@ -86,21 +86,19 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
       {/* Branding */}
       <div style={{ padding: "36px 28px 28px", position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Link href="/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 14,
-            background: "var(--gradient-primary)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 22,
-            boxShadow: "0 8px 24px -4px rgba(0,153,255,0.25)",
-          }}>
-            ⚽
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Logo"
+            width={44}
+            height={44}
+            style={{ borderRadius: 10, objectFit: "contain" }}
+          />
           <div>
             <span style={{
-              fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 800,
+              fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800,
               color: "var(--text-main)", letterSpacing: "-0.04em", lineHeight: 1,
             }}>
-              Swap<span style={{ color: "var(--primary)" }}>26</span>
+              Troca <span style={{ color: "var(--primary)" }}>Stickers</span>
             </span>
             <p style={{
               fontSize: 9, fontWeight: 700, color: "var(--text-muted)",
@@ -216,7 +214,7 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
                 <Trophy size={16} style={{ color: "#1A1100" }} />
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 12, fontWeight: 800, color: "var(--text-main)", margin: 0 }}>Swap26 PRO</p>
+                <p style={{ fontSize: 12, fontWeight: 800, color: "var(--text-main)", margin: 0 }}>Troca Stickers PRO</p>
                 <p style={{ fontSize: 10, color: "var(--text-muted)", margin: 0 }}>Desbloqueia tudo</p>
               </div>
               <Sparkles size={14} style={{ color: "var(--warning)" }} />
@@ -311,16 +309,15 @@ export default function Sidebar({ profile, email }: { profile: Profile | null, e
           padding: "0 20px", zIndex: 30, borderBottom: "1px solid var(--border-color)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 10,
-              background: "var(--gradient-primary)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16,
-            }}>
-              ⚽
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Logo"
+              width={32}
+              height={32}
+              style={{ borderRadius: 8, objectFit: "contain" }}
+            />
             <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.04em" }}>
-              Swap<span style={{ color: "var(--primary)" }}>26</span>
+              Troca <span style={{ color: "var(--primary)" }}>Stickers</span>
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

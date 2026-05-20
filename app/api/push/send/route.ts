@@ -7,7 +7,7 @@ const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 
 if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(
-    "mailto:suporte@swap26.com",
+    "mailto:suporte@trocastickers.com",
     vapidPublicKey,
     vapidPrivateKey
   );
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     let recipientId = "";
-    let pushTitle = "Swap26";
+    let pushTitle = "Troca Stickers";
     let pushBody = "Tem uma nova atualização na sua conta!";
     let pushUrl = "/feed";
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
       const actorName = actor?.nome ? actor.nome : "Alguém";
 
-      pushTitle = "Swap26";
+      pushTitle = "Troca Stickers";
       
       switch (type) {
         case "like":

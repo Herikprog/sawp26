@@ -4,12 +4,12 @@ import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "Swap26 — Troca de Figurinhas da Copa do Mundo 2026",
+  title: "Troca Stickers — Troca de Figurinhas da Copa do Mundo 2026",
   description:
     "O marketplace social de figurinhas da Copa do Mundo 2026. Encontra trocadores perto de ti, faz match automático e completa o teu álbum!",
-  keywords: "figurinhas, copa do mundo, 2026, troca, álbum, panini, swap26",
+  keywords: "figurinhas, copa do mundo, 2026, troca, álbum, panini, troca stickers",
   openGraph: {
-    title: "Swap26 — Figurinhas da Copa 2026",
+    title: "Troca Stickers — Figurinhas da Copa 2026",
     description: "Marketplace social de figurinhas com geolocalização e match automático.",
     type: "website",
   },

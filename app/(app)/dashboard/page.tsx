@@ -283,7 +283,7 @@ export default async function DashboardPage() {
               <div style={{ position: "relative", zIndex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <Trophy size={18} style={{ color: "var(--warning)" }} />
-                  <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text-main)" }}>Swap26 Pro</p>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text-main)" }}>Troca Stickers Pro</p>
                 </div>
                 <p style={{ fontSize: 13, color: "var(--text-sec)", marginBottom: 20, lineHeight: 1.5 }}>
                   Matches prioritários, badge dourado e raio ilimitado.

@@ -20,8 +20,8 @@ export default function SettingsPage() {
   useEffect(() => {
     setMounted(true);
     // Load simulated preferences from localStorage
-    const savedNotifs = localStorage.getItem("swap26_notifs");
-    const savedPublic = localStorage.getItem("swap26_public");
+    const savedNotifs = localStorage.getItem("trocastickers_notifs");
+    const savedPublic = localStorage.getItem("trocastickers_public");
     
     if (savedNotifs !== null) setNotifications(savedNotifs === "true");
     if (savedPublic !== null) setPublicProfile(savedPublic === "true");
@@ -49,14 +49,14 @@ export default function SettingsPage() {
     }
 
     setNotifications(next);
-    localStorage.setItem("swap26_notifs", String(next));
+    localStorage.setItem("trocastickers_notifs", String(next));
     toast.success(next ? "Notificações ligadas!" : "Notificações desligadas", { icon: next ? "🔔" : "🔕" });
   }
 
   function togglePublicProfile() {
     const next = !publicProfile;
     setPublicProfile(next);
-    localStorage.setItem("swap26_public", String(next));
+    localStorage.setItem("trocastickers_public", String(next));
     toast.success(next ? "Perfil agora é público!" : "Perfil agora é privado!", { icon: next ? "🌍" : "🔒" });
   }
 
@@ -289,7 +289,7 @@ export default function SettingsPage() {
         {/* Version */}
         <div style={{ textAlign: "center" }}>
           <p style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            Swap26 — Copa do Mundo 2026 · v2.0.0
+            Troca Stickers — Copa do Mundo 2026 · v2.0.0
           </p>
         </div>
 

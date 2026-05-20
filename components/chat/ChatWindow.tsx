@@ -1296,7 +1296,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
                     {msg.content}
                   </pre>
                   <span style={{ display: "block", fontSize: 10, color: "var(--text-muted)", marginTop: 12, textAlign: "right" }}>
-                    {mounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."} · Sistema de Segurança Swap26
+                    {mounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."} · Sistema de Segurança Troca Stickers
                   </span>
                 </motion.div>
               );

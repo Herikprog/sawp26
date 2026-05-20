@@ -47,7 +47,7 @@ export default async function AdminLayout({
           <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.15em", color: "#4a9eff", marginBottom: 4 }}>
             Admin Panel
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>Swap26</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>Troca Stickers</div>
           <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>{profile?.nome || user.email}</div>
         </div>
 

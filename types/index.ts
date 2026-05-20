@@ -1,5 +1,5 @@
 // ============================================================
-// SWAP26 — Tipos TypeScript Centralizados
+// TROCA STICKERS — Tipos TypeScript Centralizados
 // ============================================================
 
 export type Plan = "free" | "premium";

@@ -448,7 +448,7 @@ function ReportModal({ post, onClose }: { post: Post; onClose: () => void }) {
       >
         <h3 style={{ color: "var(--text-main)", fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Denunciar Publicação</h3>
         <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
-          Ajuda-nos a manter a Swap26 segura. Por que razão estás a denunciar esta publicação?
+          Ajuda-nos a manter a Troca Stickers segura. Por que razão estás a denunciar esta publicação?
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
