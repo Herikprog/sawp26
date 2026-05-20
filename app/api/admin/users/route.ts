@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
   let query = ctx.admin
     .from("profiles")
-    .select("id, nome, cidade, plano, is_admin, is_banned, suspended_until, total_trocas, created_at, perm_ban, perm_suspend, perm_delete_user, perm_grant_admin, perm_grant_premium, perm_impersonate, perm_tickets")
+    .select("id, nome, cidade, plano, is_admin, is_banned, suspended_until, total_trocas, created_at, perm_ban, perm_suspend, perm_delete_user, perm_grant_admin, perm_grant_premium, perm_impersonate, perm_tickets, ban_reason, suspend_reason")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -61,7 +61,7 @@ export async function PATCH(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const { action, userId, days, permissions: inputPermissions } = await request.json();
+  const { action, userId, days, permissions: inputPermissions, reason } = await request.json();
   const admin = ctx.admin;
   const adminId = ctx.user.id;
   const perms = ctx.permissions;
@@ -123,7 +123,7 @@ export async function PATCH(request: Request) {
   switch (action) {
     case "ban":
       if (!perms.perm_ban) return NextResponse.json({ error: "Sem permissão para banir utilizadores." }, { status: 403 });
-      update = { is_banned: true };
+      update = { is_banned: true, ban_reason: reason || null };
       break;
 
     case "unban":
@@ -134,14 +134,14 @@ export async function PATCH(request: Request) {
       if (isBan && !perms.perm_ban) return NextResponse.json({ error: "Sem permissão para remover ban." }, { status: 403 });
       if (isSusp && !perms.perm_suspend) return NextResponse.json({ error: "Sem permissão para remover suspensão." }, { status: 403 });
       
-      update = { is_banned: false, suspended_until: null };
+      update = { is_banned: false, suspended_until: null, ban_reason: null, suspend_reason: null };
       break;
 
     case "suspend":
       if (!perms.perm_suspend) return NextResponse.json({ error: "Sem permissão para suspender utilizadores." }, { status: 403 });
       const until = new Date();
       until.setDate(until.getDate() + (days || 7));
-      update = { suspended_until: until.toISOString() };
+      update = { suspended_until: until.toISOString(), suspend_reason: reason || null };
       logAction = `suspend_${days}d`;
       break;
 
@@ -203,12 +203,23 @@ export async function PATCH(request: Request) {
   const { error } = await admin.from("profiles").update(update).eq("id", userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Obter o nome do utilizador alvo
+  let targetUserName = "";
+  try {
+    const { data: targetProf } = await admin.from("profiles").select("nome").eq("id", userId).single();
+    targetUserName = targetProf?.nome || "";
+  } catch (_) {}
+
   // Registar no audit log
   await admin.from("admin_audit_log").insert({
     admin_id: adminId,
     action: logAction,
     target_user: userId,
-    metadata: { update }
+    metadata: { 
+      update,
+      target_user_name: targetUserName,
+      reason: reason || ""
+    }
   });
 
   // Notificar utilizador via social_notifications para ban/suspend/unban

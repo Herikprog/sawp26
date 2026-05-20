@@ -5,10 +5,11 @@ import toast from "react-hot-toast";
 import { Check, Zap, Shield, Crown, Star, ArrowRight } from "lucide-react";
 
 const FEATURES = [
-  { icon: Zap, text: "Raio de busca estendido de 50km" },
-  { icon: Shield, text: "Prioridade máxima nos resultados de match" },
-  { icon: Crown, text: "Badge dourado exclusivo no perfil" },
-  { icon: Star, text: "Acesso antecipado a novas funcionalidades" },
+  { icon: Zap, title: "Raio de Busca Estendido", desc: "Localiza e troca figurinhas com outros utilizadores num raio de busca ampliado de até 50km." },
+  { icon: Shield, title: "Prioridade Absoluta nos Matches", desc: "Os teus interesses de troca aparecem sempre no topo para os colecionadores perto de ti." },
+  { icon: Crown, title: "Badge Dourado de Destaque", desc: "Badge exclusivo com coroa dourada no teu perfil, feed social e listas de pesquisa." },
+  { icon: Star, title: "Filtros de Pesquisa Avançados", desc: "Filtra utilizadores por seleções específicas, figurinhas repetidas e distância exata." },
+  { icon: Check, title: "Propostas de Troca Ilimitadas", desc: "Propõe e aceita chamadas de troca em tempo real sem qualquer tipo de restrição diária." },
 ];
 
 export default function PremiumPage() {
@@ -58,11 +59,11 @@ export default function PremiumPage() {
       {/* Plans Grid */}
       <div style={{ display: "flex", justifyContent: "center" }}>
         {/* Premium Plan */}
-        <div style={{ position: "relative", width: "100%", maxWidth: 450 }}>
+        <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
           <div style={{
             position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
             background: "linear-gradient(135deg, #F5B700, #FFD95A)",
-            color: "var(--bg-main)", fontSize: 10, fontWeight: 900,
+            color: "#0c1322", fontSize: 10, fontWeight: 900,
             padding: "5px 16px", borderRadius: 100,
             textTransform: "uppercase", letterSpacing: "0.15em", zIndex: 10,
           }}>
@@ -85,9 +86,21 @@ export default function PremiumPage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 40 }}>
               {FEATURES.map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <f.icon size={16} style={{ color: "var(--warning)", marginTop: 2 }} />
-                  <span style={{ fontSize: 14, color: "var(--text-main)" }}>{f.text}</span>
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                  <div style={{
+                    background: "rgba(245,183,0,0.08)", borderRadius: 10, padding: 8,
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+                  }}>
+                    <f.icon size={16} style={{ color: "var(--warning)" }} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", margin: "0 0 4px 0" }}>
+                      {f.title}
+                    </h4>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.4 }}>
+                      {f.desc}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -97,7 +110,7 @@ export default function PremiumPage() {
                 width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 padding: "16px", borderRadius: 14, border: "none", cursor: "pointer",
                 background: "linear-gradient(135deg, #F5B700, #FFD95A)",
-                color: "var(--bg-main)", fontWeight: 800, fontSize: 15,
+                color: "#0c1322", fontWeight: 800, fontSize: 15,
                 boxShadow: "0 8px 24px -4px rgba(245,183,0,0.3)",
                 transition: "all 0.3s ease",
               }}>

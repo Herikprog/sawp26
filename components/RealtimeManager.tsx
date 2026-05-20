@@ -68,6 +68,55 @@ export default function RealtimeManager() {
     updateLocation();
   }, [supabase, router]);
 
+  // ─── Atualização de Status Online (Heartbeat) ───
+  useEffect(() => {
+    let activeUser: string | null = null;
+
+    const setOnline = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        activeUser = user.id;
+
+        await supabase
+          .from("profiles")
+          .update({ is_online: true, last_seen: new Date().toISOString() })
+          .eq("id", user.id);
+      } catch (_) {}
+    };
+
+    const setOffline = async () => {
+      if (!activeUser) return;
+      try {
+        await supabase
+          .from("profiles")
+          .update({ is_online: false, last_seen: new Date().toISOString() })
+          .eq("id", activeUser);
+      } catch (_) {}
+    };
+
+    setOnline();
+    const interval = setInterval(setOnline, 30000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        setOnline();
+      } else {
+        setOffline();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", setOffline);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", setOffline);
+      setOffline();
+    };
+  }, [supabase]);
+
   // ─── Ouvintes em Tempo Real (Realtime Subscriptions) ───
   useEffect(() => {
     const channel = supabase.channel("global-realtime")

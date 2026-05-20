@@ -7,6 +7,7 @@ import Link from "next/link";
 function BannedContent() {
   const params = useSearchParams();
   const until = params.get("until");
+  const reason = params.get("reason");
   const isSuspended = !!until;
   const untilDate = until ? new Date(until).toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
 
@@ -56,18 +57,32 @@ function BannedContent() {
           </div>
         )}
 
-        <div style={{
-          background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)",
-          borderRadius: 16, padding: 20, margin: "24px 0", textAlign: "left"
-        }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 10 }}>📋 Possíveis motivos:</p>
-          <ul style={{ margin: 0, padding: "0 0 0 18px", color: "#9ca3af", fontSize: 13, lineHeight: 2 }}>
-            <li>Comportamento abusivo ou desrespeitoso</li>
-            <li>Uso fraudulento da plataforma</li>
-            <li>Violação dos Termos de Serviço</li>
-            <li>Spam ou atividade automatizada</li>
-          </ul>
-        </div>
+        {reason ? (
+          <div style={{
+            background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)",
+            borderRadius: 16, padding: "20px 24px", margin: "24px 0", textAlign: "left"
+          }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              ⚠️ Motivo da Decisão:
+            </p>
+            <p style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
+              "{reason}"
+            </p>
+          </div>
+        ) : (
+          <div style={{
+            background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)",
+            borderRadius: 16, padding: 20, margin: "24px 0", textAlign: "left"
+          }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 10 }}>📋 Possíveis motivos:</p>
+            <ul style={{ margin: 0, padding: "0 0 0 18px", color: "#9ca3af", fontSize: 13, lineHeight: 2 }}>
+              <li>Comportamento abusivo ou desrespeitoso</li>
+              <li>Uso fraudulento da plataforma</li>
+              <li>Violação dos Termos de Serviço</li>
+              <li>Spam ou atividade automatizada</li>
+            </ul>
+          </div>
+        )}
 
         <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 24 }}>
           Se acreditas que foi um erro, contacta o suporte através do email{" "}

@@ -43,6 +43,10 @@ export default function AdminUsersPage() {
     perm_tickets: false
   });
 
+  // Estado para pop-up de motivo de ban/suspensão
+  const [reasonModal, setReasonModal] = useState<{ action: string, userId: string, extra?: any } | null>(null);
+  const [reasonText, setReasonText] = useState("");
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/admin/users?search=${encodeURIComponent(search)}`);
@@ -390,7 +394,10 @@ export default function AdminUsersPage() {
                   min={1}
                   style={{ width: 70, padding: "10px 12px", background: "#0a0f1a", border: "1px solid #1e2736", borderRadius: 10, color: "#fff", fontSize: 13, textAlign: "center", outline: "none" }}
                 />
-                <button onClick={() => doAction("suspend", selectedUser.id, { days: suspendDays })} disabled={actionLoading}
+                <button onClick={() => {
+                  setReasonModal({ action: "suspend", userId: selectedUser.id, extra: { days: suspendDays } });
+                  setReasonText("");
+                }} disabled={actionLoading}
                   style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.2)", borderRadius: 12, color: "#fb923c", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                   <Clock size={16} /> Suspender (dias)
                 </button>
@@ -405,7 +412,14 @@ export default function AdminUsersPage() {
               )}
 
               {/* Ban */}
-              <button onClick={() => doAction(selectedUser.is_banned ? "unban" : "ban", selectedUser.id)} disabled={actionLoading}
+              <button onClick={() => {
+                if (selectedUser.is_banned) {
+                  doAction("unban", selectedUser.id);
+                } else {
+                  setReasonModal({ action: "ban", userId: selectedUser.id });
+                  setReasonText("");
+                }
+              }} disabled={actionLoading}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, color: "#f87171", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                 <Ban size={16} /> {selectedUser.is_banned ? "Remover Ban" : "Banir Permanentemente"}
               </button>
@@ -414,6 +428,68 @@ export default function AdminUsersPage() {
               <button onClick={() => deleteUser(selectedUser.id)} disabled={actionLoading}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 12, color: "#ef4444", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                 <Trash2 size={16} /> Apagar Conta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reason Dialog Modal */}
+      {reasonModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(5px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000
+        }}>
+          <div style={{
+            background: "#0d1117", border: "1px solid #1e2736", borderRadius: 20,
+            padding: 24, width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 16
+          }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+              {reasonModal.action === "suspend" ? "⏸ Confirmar Suspensão" : "🚫 Confirmar Banimento"}
+            </h3>
+            
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0, lineHeight: 1.5 }}>
+              Indique o motivo para esta ação. Este motivo será apresentado ao utilizador quando este tentar entrar na plataforma.
+            </p>
+
+            <textarea
+              value={reasonText}
+              onChange={(e) => setReasonText(e.target.value)}
+              placeholder="Escreva aqui o motivo..."
+              rows={4}
+              style={{
+                width: "100%", padding: 12, background: "#06090f", border: "1px solid #1e2736",
+                borderRadius: 10, color: "#fff", fontSize: 13, resize: "none", outline: "none", boxSizing: "border-box"
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
+              <button
+                onClick={() => setReasonModal(null)}
+                style={{
+                  padding: "8px 16px", background: "transparent", border: "1px solid #1e2736",
+                  borderRadius: 10, color: "#a0aec0", fontSize: 13, fontWeight: 600, cursor: "pointer"
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!reasonText.trim()) {
+                    toast.error("O motivo é obrigatório.");
+                    return;
+                  }
+                  doAction(reasonModal.action, reasonModal.userId, { ...reasonModal.extra, reason: reasonText });
+                  setReasonModal(null);
+                }}
+                disabled={actionLoading}
+                style={{
+                  padding: "8px 16px",
+                  background: reasonModal.action === "suspend" ? "#fb923c" : "#f87171",
+                  border: "none", borderRadius: 10, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer"
+                }}
+              >
+                Confirmar
               </button>
             </div>
           </div>

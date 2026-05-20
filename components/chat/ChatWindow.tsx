@@ -885,7 +885,7 @@ export default function ChatWindow({ conversationId, initialMessages, myUserId, 
             </div>
             <p style={{ fontSize: 12, color: otherUser.is_online ? "var(--success)" : "var(--text-muted)", margin: 0 }}>
               {mounted 
-                ? (otherUser.is_online ? "Online agora" : `Visto há ${timeAgo(otherUser.last_seen)}`)
+                ? (otherUser.is_online ? "Online agora" : `Visto ${timeAgo(otherUser.last_seen)}`)
                 : "Carregando..."}
             </p>
           </div>

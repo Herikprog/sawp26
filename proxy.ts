@@ -62,7 +62,7 @@ export async function proxy(request: NextRequest) {
   // Verificar estado do perfil
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plano, is_banned, suspended_until")
+    .select("plano, is_banned, suspended_until, ban_reason, suspend_reason")
     .eq("id", user.id)
     .single();
 
@@ -83,6 +83,9 @@ export async function proxy(request: NextRequest) {
   if (isBanned) {
     const url = request.nextUrl.clone();
     url.pathname = "/banned";
+    if (profile?.ban_reason) {
+      url.searchParams.set("reason", profile.ban_reason);
+    }
     return NextResponse.redirect(url);
   }
 
@@ -91,6 +94,9 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/banned";
     url.searchParams.set("until", profile.suspended_until);
+    if (profile?.suspend_reason) {
+      url.searchParams.set("reason", profile.suspend_reason);
+    }
     return NextResponse.redirect(url);
   }
 
