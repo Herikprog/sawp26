@@ -89,7 +89,7 @@ export async function GET(request: Request) {
       created_at,
       posts (
         content,
-        profiles (
+        profiles!posts_user_id_fkey (
           nome
         )
       ),
