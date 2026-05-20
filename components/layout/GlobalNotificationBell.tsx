@@ -18,12 +18,25 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
   
   const supabase = createClient();
   const [email, setEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then((res: any) => {
+    supabase.auth.getUser().then(async (res: any) => {
       const u = res?.data?.user;
-      if (u?.email) setEmail(u.email);
+      if (u) {
+        if (u.email) setEmail(u.email);
+        
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", u.id)
+          .single();
+          
+        if (profile?.is_admin) {
+          setIsAdmin(true);
+        }
+      }
     });
   }, []);
 
@@ -236,7 +249,7 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
 
   return (
     <>
-      {email?.toLowerCase() === "bragawork01@gmail.com" && (
+      {(isAdmin || email?.toLowerCase() === "bragawork01@gmail.com") && (
         <Link href="/admin" style={adminButtonStyles} title="Painel Admin">
           <Shield size={isMobile ? 16 : 20} />
         </Link>

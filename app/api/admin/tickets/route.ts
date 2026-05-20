@@ -8,9 +8,18 @@ async function verifyAdmin() {
     if (!user) return null;
     const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
     const admin = await createAdminClient();
-    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("is_admin, perm_tickets")
+      .eq("id", user.id)
+      .single();
     if (!isEmailAdmin && !profile?.is_admin) return null;
-    return { user, admin };
+
+    const permissions = {
+      perm_tickets: isEmailAdmin ? true : !!profile?.perm_tickets,
+    };
+
+    return { user, admin, permissions, isSuperAdmin: isEmailAdmin };
   } catch (err: any) {
     console.error("[verifyAdmin] error:", err.message);
     return null;
@@ -21,6 +30,10 @@ async function verifyAdmin() {
 export async function GET(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  
+  if (!ctx.permissions.perm_tickets) {
+    return NextResponse.json({ error: "Sem permissão para visualizar tickets de suporte." }, { status: 403 });
+  }
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || "open";
@@ -72,11 +85,37 @@ export async function PATCH(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
+  if (!ctx.permissions.perm_tickets) {
+    return NextResponse.json({ error: "Sem permissão para responder a tickets de suporte." }, { status: 403 });
+  }
+
   const { id, admin_reply, user_id, status } = await request.json();
+
+  // Proteger tickets/denúncias criados pelo bragawork01@gmail.com
+  try {
+    if (!String(id).startsWith("report_")) {
+      const { data: ticket } = await ctx.admin
+        .from("support_tickets")
+        .select("user_id")
+        .eq("id", id)
+        .single();
+
+      if (ticket) {
+        const { data: targetUser } = await ctx.admin.auth.admin.getUserById(ticket.user_id);
+        if (targetUser?.user?.email?.toLowerCase() === "bragawork01@gmail.com") {
+          return NextResponse.json({ error: "Não é permitido alterar ou fechar tickets do Administrador Principal." }, { status: 403 });
+        }
+      }
+    } else {
+      const { data: targetUser } = await ctx.admin.auth.admin.getUserById(user_id);
+      if (targetUser?.user?.email?.toLowerCase() === "bragawork01@gmail.com") {
+        return NextResponse.json({ error: "Não é permitido alterar ou responder a denúncias criadas pelo Administrador Principal." }, { status: 403 });
+      }
+    }
+  } catch (_) {}
 
   // Se for um report do botão de denúncia (id começa com "report_"), ignorar update na tabela support_tickets
   if (String(id).startsWith("report_")) {
-    // Apenas notificar — não temos tabela de reply para user_reports
     if (admin_reply && user_id) {
       try {
         await ctx.admin.from("social_notifications").insert({

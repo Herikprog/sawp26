@@ -8,16 +8,31 @@ async function verifyAdmin() {
     if (!user) return null;
     const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
     const admin = await createAdminClient();
-    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("is_admin, perm_ban, perm_suspend, perm_delete_user, perm_grant_admin, perm_grant_premium, perm_impersonate, perm_tickets")
+      .eq("id", user.id)
+      .single();
     if (!isEmailAdmin && !profile?.is_admin) return null;
-    return { user, admin };
+
+    const permissions = {
+      perm_ban: isEmailAdmin ? true : !!profile?.perm_ban,
+      perm_suspend: isEmailAdmin ? true : !!profile?.perm_suspend,
+      perm_delete_user: isEmailAdmin ? true : !!profile?.perm_delete_user,
+      perm_grant_admin: isEmailAdmin ? true : !!profile?.perm_grant_admin,
+      perm_grant_premium: isEmailAdmin ? true : !!profile?.perm_grant_premium,
+      perm_impersonate: isEmailAdmin ? true : !!profile?.perm_impersonate,
+      perm_tickets: isEmailAdmin ? true : !!profile?.perm_tickets,
+    };
+
+    return { user, admin, permissions, isSuperAdmin: isEmailAdmin };
   } catch (err: any) {
     console.error("[verifyAdmin] error:", err.message);
     return null;
   }
 }
 
-// GET — listar utilizadores
+// GET — listar utilizadores com as suas permissões detalhadas
 export async function GET(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -27,7 +42,7 @@ export async function GET(request: Request) {
 
   let query = ctx.admin
     .from("profiles")
-    .select("id, nome, cidade, plano, is_admin, is_banned, suspended_until, total_trocas, created_at")
+    .select("id, nome, cidade, plano, is_admin, is_banned, suspended_until, total_trocas, created_at, perm_ban, perm_suspend, perm_delete_user, perm_grant_admin, perm_grant_premium, perm_impersonate, perm_tickets")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -41,16 +56,31 @@ export async function GET(request: Request) {
   return NextResponse.json({ users });
 }
 
-// PATCH — executar ação sobre um utilizador
+// PATCH — executar ação sobre um utilizador com controle de permissões
 export async function PATCH(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const { action, userId, days } = await request.json();
+  const { action, userId, days, permissions: inputPermissions } = await request.json();
   const admin = ctx.admin;
   const adminId = ctx.user.id;
+  const perms = ctx.permissions;
 
+  // 1. Proteger a conta do Administrador Principal bragawork01@gmail.com
+  try {
+    const { data: targetUser } = await admin.auth.admin.getUserById(userId);
+    const targetEmail = targetUser?.user?.email?.toLowerCase();
+    if (targetEmail === "bragawork01@gmail.com") {
+      return NextResponse.json({ error: "Não é permitido alterar ou remover privilégios do Administrador Principal." }, { status: 403 });
+    }
+  } catch (_) {}
+
+  // 2. Controlar permissões com base na ação solicitada
   if (action === "impersonate") {
+    if (!perms.perm_impersonate) {
+      return NextResponse.json({ error: "Sem permissão para entrar em contas." }, { status: 403 });
+    }
+
     try {
       const { data: targetUser, error: userError } = await admin.auth.admin.getUserById(userId);
       if (userError || !targetUser.user?.email) {
@@ -92,29 +122,80 @@ export async function PATCH(request: Request) {
 
   switch (action) {
     case "ban":
+      if (!perms.perm_ban) return NextResponse.json({ error: "Sem permissão para banir utilizadores." }, { status: 403 });
       update = { is_banned: true };
       break;
+
     case "unban":
+      // Validar se está a tentar remover ban ou suspensão
+      const { data: targetProfile } = await admin.from("profiles").select("suspended_until, is_banned").eq("id", userId).single();
+      const isSusp = targetProfile?.suspended_until && new Date(targetProfile.suspended_until) > new Date();
+      const isBan = targetProfile?.is_banned;
+      if (isBan && !perms.perm_ban) return NextResponse.json({ error: "Sem permissão para remover ban." }, { status: 403 });
+      if (isSusp && !perms.perm_suspend) return NextResponse.json({ error: "Sem permissão para remover suspensão." }, { status: 403 });
+      
       update = { is_banned: false, suspended_until: null };
       break;
+
     case "suspend":
+      if (!perms.perm_suspend) return NextResponse.json({ error: "Sem permissão para suspender utilizadores." }, { status: 403 });
       const until = new Date();
       until.setDate(until.getDate() + (days || 7));
       update = { suspended_until: until.toISOString() };
       logAction = `suspend_${days}d`;
       break;
+
     case "set_premium":
+      if (!perms.perm_grant_premium) return NextResponse.json({ error: "Sem permissão para gerir plano Premium." }, { status: 403 });
       update = { plano: "premium" };
       break;
+
     case "set_free":
+      if (!perms.perm_grant_premium) return NextResponse.json({ error: "Sem permissão para gerir plano Premium." }, { status: 403 });
       update = { plano: "free" };
       break;
+
     case "set_admin":
-      update = { is_admin: true };
+      if (!perms.perm_grant_admin) return NextResponse.json({ error: "Sem permissão para gerir administradores." }, { status: 403 });
+      update = { 
+        is_admin: true,
+        perm_ban: !!inputPermissions?.perm_ban,
+        perm_suspend: !!inputPermissions?.perm_suspend,
+        perm_delete_user: !!inputPermissions?.perm_delete_user,
+        perm_grant_admin: !!inputPermissions?.perm_grant_admin,
+        perm_grant_premium: !!inputPermissions?.perm_grant_premium,
+        perm_impersonate: !!inputPermissions?.perm_impersonate,
+        perm_tickets: !!inputPermissions?.perm_tickets
+      };
       break;
+
     case "remove_admin":
-      update = { is_admin: false };
+      if (!perms.perm_grant_admin) return NextResponse.json({ error: "Sem permissão para gerir administradores." }, { status: 403 });
+      update = { 
+        is_admin: false,
+        perm_ban: false,
+        perm_suspend: false,
+        perm_delete_user: false,
+        perm_grant_admin: false,
+        perm_grant_premium: false,
+        perm_impersonate: false,
+        perm_tickets: false
+      };
       break;
+
+    case "update_permissions":
+      if (!perms.perm_grant_admin) return NextResponse.json({ error: "Sem permissão para gerir permissões de administrador." }, { status: 403 });
+      update = { 
+        perm_ban: !!inputPermissions?.perm_ban,
+        perm_suspend: !!inputPermissions?.perm_suspend,
+        perm_delete_user: !!inputPermissions?.perm_delete_user,
+        perm_grant_admin: !!inputPermissions?.perm_grant_admin,
+        perm_grant_premium: !!inputPermissions?.perm_grant_premium,
+        perm_impersonate: !!inputPermissions?.perm_impersonate,
+        perm_tickets: !!inputPermissions?.perm_tickets
+      };
+      break;
+
     default:
       return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   }
@@ -155,23 +236,37 @@ export async function PATCH(request: Request) {
 
   const messages: Record<string, string> = {
     ban: "Utilizador banido com sucesso.",
-    unban: "Ban removido com sucesso.",
+    unban: "Ban/suspensão removido com sucesso.",
     suspend: `Utilizador suspenso por ${days} dia(s).`,
     set_premium: "Plano Premium concedido.",
     set_free: "Plano revertido para Free.",
     set_admin: "Permissão de administrador concedida.",
     remove_admin: "Permissão de administrador removida.",
+    update_permissions: "Permissões de administrador atualizadas.",
   };
 
   return NextResponse.json({ success: true, message: messages[action] || "Ação concluída." });
 }
 
-// DELETE — apagar conta
+// DELETE — apagar conta com controle de permissão
 export async function DELETE(request: Request) {
   const ctx = await verifyAdmin();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const { userId } = await request.json();
+  
+  if (!ctx.permissions.perm_delete_user) {
+    return NextResponse.json({ error: "Sem permissão para apagar contas." }, { status: 403 });
+  }
+
+  // Proteger o Administrador Principal
+  try {
+    const { data: targetUser } = await ctx.admin.auth.admin.getUserById(userId);
+    const targetEmail = targetUser?.user?.email?.toLowerCase();
+    if (targetEmail === "bragawork01@gmail.com") {
+      return NextResponse.json({ error: "Não é permitido apagar a conta do Administrador Principal." }, { status: 403 });
+    }
+  } catch (_) {}
 
   // Apagar o utilizador diretamente via Admin API do Supabase
   const { error } = await ctx.admin.auth.admin.deleteUser(userId);

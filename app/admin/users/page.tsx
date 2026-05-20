@@ -15,6 +15,13 @@ interface User {
   total_trocas: number;
   created_at: string;
   email?: string;
+  perm_ban?: boolean;
+  perm_suspend?: boolean;
+  perm_delete_user?: boolean;
+  perm_grant_admin?: boolean;
+  perm_grant_premium?: boolean;
+  perm_impersonate?: boolean;
+  perm_tickets?: boolean;
 }
 
 export default function AdminUsersPage() {
@@ -24,6 +31,17 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [suspendDays, setSuspendDays] = useState(7);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Permissões locais para edição no modal
+  const [perms, setPerms] = useState({
+    perm_ban: false,
+    perm_suspend: false,
+    perm_delete_user: false,
+    perm_grant_admin: false,
+    perm_grant_premium: false,
+    perm_impersonate: false,
+    perm_tickets: false
+  });
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -37,6 +55,21 @@ export default function AdminUsersPage() {
     const t = setTimeout(fetchUsers, 300);
     return () => clearTimeout(t);
   }, [fetchUsers]);
+
+  // Sincronizar permissões locais quando abre o modal
+  useEffect(() => {
+    if (selectedUser) {
+      setPerms({
+        perm_ban: !!selectedUser.perm_ban,
+        perm_suspend: !!selectedUser.perm_suspend,
+        perm_delete_user: !!selectedUser.perm_delete_user,
+        perm_grant_admin: !!selectedUser.perm_grant_admin,
+        perm_grant_premium: !!selectedUser.perm_grant_premium,
+        perm_impersonate: !!selectedUser.perm_impersonate,
+        perm_tickets: !!selectedUser.perm_tickets
+      });
+    }
+  }, [selectedUser]);
 
   async function doAction(action: string, userId: string, extra?: any) {
     setActionLoading(true);
@@ -233,8 +266,9 @@ export default function AdminUsersPage() {
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
         }}>
           <div style={{
-            background: "#0d1117", border: "1px solid #1e2736", borderRadius: 20,
-            padding: 28, width: "100%", maxWidth: 420, position: "relative"
+            background: "#0d1117", border: "1px solid #1e2736", borderRadius: 24,
+            padding: 28, width: "100%", maxWidth: 440, position: "relative",
+            maxHeight: "90vh", overflowY: "auto"
           }}>
             <button onClick={() => setSelectedUser(null)} style={{
               position: "absolute", top: 16, right: 16, background: "none", border: "none",
@@ -258,7 +292,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {/* Impersonate */}
               <button onClick={() => impersonateUser(selectedUser.id)} disabled={actionLoading}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: 12, color: "#a78bfa", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
@@ -286,11 +320,66 @@ export default function AdminUsersPage() {
                 <Crown size={16} /> {selectedUser.plano === "premium" ? "Remover Premium" : "Conceder Premium"}
               </button>
 
-              {/* Admin */}
-              <button onClick={() => doAction("set_admin", selectedUser.id)} disabled={actionLoading}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(74,158,255,0.08)", border: "1px solid rgba(74,158,255,0.2)", borderRadius: 12, color: "#4a9eff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                <Shield size={16} /> Tornar Administrador
-              </button>
+              {/* CONTROLE DE PERMISSÕES DO ADMINISTRADOR */}
+              <div style={{ 
+                padding: 16, background: "rgba(255,255,255,0.02)", 
+                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16 
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Shield size={14} style={{ color: "#4a9eff" }} /> 
+                    {selectedUser.is_admin ? "Cargo: Administrador" : "Promover a Administrador"}
+                  </span>
+                  
+                  {selectedUser.is_admin && (
+                    <button 
+                      onClick={() => doAction("remove_admin", selectedUser.id)} 
+                      disabled={actionLoading}
+                      style={{ 
+                        background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.2)", 
+                        borderRadius: 8, color: "#ef4444", padding: "4px 10px", 
+                        fontSize: 11, fontWeight: 700, cursor: "pointer" 
+                      }}
+                    >
+                      Remover Cargo Admin
+                    </button>
+                  )}
+                </div>
+
+                {/* Lista de Permissões */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                  {[
+                    { key: "perm_ban", label: "Banir Utilizadores" },
+                    { key: "perm_suspend", label: "Suspender Utilizadores" },
+                    { key: "perm_delete_user", label: "Apagar Contas (Delete)" },
+                    { key: "perm_grant_admin", label: "Gerir Administradores" },
+                    { key: "perm_grant_premium", label: "Gerir Plano Premium" },
+                    { key: "perm_impersonate", label: "Entrar em Contas (Impersonate)" },
+                    { key: "perm_tickets", label: "Responder a Tickets/Denúncias" }
+                  ].map((p) => (
+                    <label key={p.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#a0aec0", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={(perms as any)[p.key]}
+                        onChange={(e) => setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
+                        style={{ accentColor: "#4a9eff" }}
+                      />
+                      {p.label}
+                    </label>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => doAction(selectedUser.is_admin ? "update_permissions" : "set_admin", selectedUser.id, { permissions: perms })}
+                  disabled={actionLoading}
+                  style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 10, border: "none", cursor: "pointer",
+                    background: "var(--gradient-primary)", color: "#fff", fontSize: 12, fontWeight: 700
+                  }}
+                >
+                  {selectedUser.is_admin ? "Guardar Permissões" : "Confirmar e Dar Admin"}
+                </button>
+              </div>
 
               {/* Suspend */}
               <div style={{ display: "flex", gap: 8 }}>
