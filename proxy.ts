@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Rotas que não precisam de sessão nem de assinatura
-const PUBLIC_ROUTES = ["/login", "/register", "/auth"];
+const PUBLIC_ROUTES = ["/login", "/register", "/auth", "/termos", "/privacidade"];
 
 // Rotas que precisam de sessão mas NÃO precisam de assinatura ativa
 const SESSION_ONLY_ROUTES = ["/premium", "/api", "/admin"];
