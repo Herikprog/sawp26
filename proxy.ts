@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Rotas que não precisam de sessão nem de assinatura
-const PUBLIC_ROUTES = ["/login", "/register", "/auth", "/banned"];
+const PUBLIC_ROUTES = ["/login", "/register", "/auth"];
 
 // Rotas que precisam de sessão mas NÃO precisam de assinatura ativa
 const SESSION_ONLY_ROUTES = ["/premium", "/api", "/admin"];
@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
 
   // Deixar passar rotas públicas e assets
   if (
-    PUBLIC_ROUTES.some((r) => pathname.startsWith(r)) ||
+    (PUBLIC_ROUTES.some((r) => pathname.startsWith(r)) && !pathname.startsWith("/banned")) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||
@@ -48,38 +48,54 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Sem sessão → redirecionar para login
+  // Sem sessão → se for /banned, deixar ver. Se for outra rota, vai para login.
   if (!user) {
+    if (pathname.startsWith("/banned")) {
+      return response;
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Rotas que só precisam de sessão (admin, api, premium) — sem verificar assinatura
-  if (SESSION_ONLY_ROUTES.some((r) => pathname.startsWith(r))) {
-    return response;
-  }
-
-  // Verificar estado do perfil para rotas protegidas
+  // Verificar estado do perfil
   const { data: profile } = await supabase
     .from("profiles")
     .select("plano, is_banned, suspended_until")
     .eq("id", user.id)
     .single();
 
-  // Conta banida → redirecionar para página de ban
-  if (profile?.is_banned) {
+  const isBanned = profile?.is_banned;
+  const isSuspended = profile?.suspended_until && new Date(profile.suspended_until) > new Date();
+
+  // Se o utilizador aceder a /banned mas não estiver banido nem suspenso -> mandar para /dashboard
+  if (pathname.startsWith("/banned")) {
+    if (!isBanned && !isSuspended) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return response;
+  }
+
+  // Se estiver noutra rota e estiver banido -> mandar para /banned
+  if (isBanned) {
     const url = request.nextUrl.clone();
     url.pathname = "/banned";
     return NextResponse.redirect(url);
   }
 
-  // Conta suspensa → redirecionar para página de suspensão
-  if (profile?.suspended_until && new Date(profile.suspended_until) > new Date()) {
+  // Se estiver noutra rota e estiver suspenso -> mandar para /banned com ?until=
+  if (isSuspended) {
     const url = request.nextUrl.clone();
     url.pathname = "/banned";
     url.searchParams.set("until", profile.suspended_until);
     return NextResponse.redirect(url);
+  }
+
+  // Rotas que só precisam de sessão (admin, api, premium) — sem verificar assinatura
+  if (SESSION_ONLY_ROUTES.some((r) => pathname.startsWith(r))) {
+    return response;
   }
 
   // Allow free users to access the page (contents will be obfuscated at the component level)

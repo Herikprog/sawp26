@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Heart, MessageSquare, Repeat2, UserPlus, CheckCheck, X, Shield } from "lucide-react";
+import { Bell, Heart, MessageSquare, Repeat2, UserPlus, CheckCheck, X, Shield, ShieldAlert, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -146,7 +146,21 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
   }
 
   function getNotificationContent(n: any) {
-    const actorName = n.actor?.nome || "Alguém";
+    const actorName = n.actor?.nome || "Administrador";
+    // admin_reply e admin_action usam n.content diretamente
+    if (n.type === "admin_reply") {
+      return {
+        icon: <MessageSquare size={12} color="#4a9eff" />,
+        text: <span><b>Suporte</b>: {n.content || "A tua mensagem foi respondida pelo administrador."}</span>
+      };
+    }
+    if (n.type === "admin_action") {
+      const isBan = n.content?.includes("banida") || n.content?.includes("suspensa");
+      return {
+        icon: <ShieldAlert size={12} color={isBan ? "#f87171" : "#34d399"} />,
+        text: <span><b>Administrador</b>: {n.content || "A tua conta foi atualizada."}</span>
+      };
+    }
     switch (n.type) {
       case "like": 
         return { 
@@ -176,7 +190,7 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
       default: 
         return { 
           icon: <Bell size={12} />, 
-          text: <span>Nova notificação de <b>{actorName}</b>.</span> 
+          text: <span>{n.content || `Nova notificação de `}<b>{actorName}</b>.</span> 
         };
     }
   }
@@ -314,7 +328,15 @@ export default function GlobalNotificationBell({ isMobile = false }: { isMobile?
               ) : (
                 notifications.map((n) => {
                   const { icon, text } = getNotificationContent(n);
-                  const linkHref = n.type === "follow" ? `/profile/${n.actor?.id}` : (n.post_id ? `/feed#post-${n.post_id}` : "#");
+                  // Routing: admin notifications → /support, follow → profile, posts → feed
+                  const isAdminNotif = n.type === "admin_reply" || n.type === "admin_action";
+                  const linkHref = isAdminNotif
+                    ? "/support"
+                    : n.type === "follow"
+                    ? `/profile/${n.actor?.id}`
+                    : n.post_id
+                    ? `/feed#post-${n.post_id}`
+                    : "#";
 
                   return (
                     <Link

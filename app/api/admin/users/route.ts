@@ -61,7 +61,7 @@ export async function PATCH(request: Request) {
         type: "magiclink",
         email: targetUser.user.email,
         options: {
-          redirectTo: `${new URL(request.url).origin}/auth/callback?next=/dashboard`
+          redirectTo: `${new URL(request.url).origin}/auth/session`
         }
       });
       

@@ -76,9 +76,29 @@ function BannedContent() {
           </a>
         </p>
 
+        <div style={{ margin: "24px 0" }}>
+          <Link
+            href="/dashboard"
+            style={{
+              display: "inline-block",
+              padding: "12px 24px",
+              background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+              color: "#fff",
+              borderRadius: 12,
+              fontWeight: 700,
+              fontSize: 13,
+              textDecoration: "none",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)",
+              transition: "all 0.2s"
+            }}
+          >
+            Tentar Entrar Novamente
+          </Link>
+        </div>
+
         {/* Botão de voltar apenas para suspensão temporária */}
         {isSuspended && (
-          <p style={{ fontSize: 12, color: "#555" }}>
+          <p style={{ fontSize: 12, color: "#555", marginTop: 8 }}>
             A página irá desbloquear automaticamente quando a suspensão terminar.
           </p>
         )}
