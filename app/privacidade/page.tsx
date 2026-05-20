@@ -40,7 +40,7 @@ export default function PrivacidadePage() {
           background: "var(--card-bg)",
           border: "1px solid var(--border-color)",
           borderRadius: "24px",
-          padding: "48px",
+          padding: "clamp(24px, 5vw, 48px)",
           boxShadow: "var(--shadow-lg)"
         }}>
           <div style={{

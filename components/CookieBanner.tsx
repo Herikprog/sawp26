@@ -48,7 +48,7 @@ export function CookieBanner() {
             background: "var(--bg-main)",
             border: "1px solid var(--border-color)",
             borderRadius: 20,
-            padding: "24px",
+            padding: "clamp(16px, 4vw, 24px)",
             boxShadow: "var(--shadow-xl)",
             display: "flex",
             flexDirection: "column",
@@ -86,7 +86,7 @@ export function CookieBanner() {
               </button>
             </div>
             
-            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 4 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "flex-end", marginTop: 4 }}>
               <button 
                 onClick={handleDecline}
                 style={{
