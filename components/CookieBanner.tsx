@@ -40,72 +40,46 @@ export function CookieBanner() {
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 9999,
-            width: "calc(100% - 48px)",
+            width: "calc(100% - 32px)",
             maxWidth: 800,
           }}
         >
-          <div style={{
-            background: "var(--bg-main)",
-            border: "1px solid var(--border-color)",
-            borderRadius: 20,
-            padding: "clamp(16px, 4vw, 24px)",
-            boxShadow: "var(--shadow-xl)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            backdropFilter: "blur(12px)",
-          }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-              <div style={{ display: "flex", gap: 16 }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  background: "var(--primary-light)", color: "var(--primary)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0
-                }}>
-                  <Cookie size={20} />
+          <div className="bg-[var(--bg-main)] border border-[var(--border-color)] rounded-[20px] p-4 sm:p-6 shadow-[var(--shadow-xl)] flex flex-col gap-4 sm:gap-5 backdrop-blur-md">
+            <div className="flex items-start justify-between gap-3 sm:gap-4">
+              <div className="flex gap-3 sm:gap-4">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center shrink-0">
+                  <Cookie size={18} className="sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)", marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <h3 className="text-[14px] sm:text-[16px] font-bold text-[var(--text-main)] mb-1 sm:mb-1.5 font-['Space_Grotesk',sans-serif]">
                     Valorizamos a tua privacidade
                   </h3>
-                  <p style={{ fontSize: 13, color: "var(--text-sec)", lineHeight: 1.5, maxWidth: 500 }}>
+                  <p className="text-[12px] sm:text-[13px] text-[var(--text-sec)] leading-relaxed max-w-[500px]">
                     A Troca Stickers utiliza cookies estritamente necessários para o funcionamento e segurança da plataforma (autenticação). Podes ler mais sobre isto na nossa{" "}
-                    <Link href="/privacidade" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Política de Privacidade</Link>.
+                    <Link href="/privacidade" className="text-[var(--primary)] font-semibold underline hover:opacity-80 transition-opacity">Política de Privacidade</Link>.
                   </p>
                 </div>
               </div>
               <button 
                 onClick={() => setIsVisible(false)}
-                style={{ 
-                  background: "transparent", border: "none", color: "var(--text-muted)",
-                  cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center"
-                }}
+                className="bg-transparent border-none text-[var(--text-muted)] cursor-pointer p-1.5 flex items-center justify-center hover:bg-[var(--bg-sec)] rounded-full transition-colors shrink-0 -mt-1 -mr-1 sm:mt-0 sm:mr-0"
               >
                 <X size={18} />
               </button>
             </div>
             
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "flex-end", marginTop: 4 }}>
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 sm:justify-end mt-1 sm:mt-2">
               <button 
                 onClick={handleDecline}
-                style={{
-                  padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                  background: "transparent", color: "var(--text-sec)", border: "1px solid var(--border-color)",
-                  cursor: "pointer"
-                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-transparent text-[var(--text-sec)] border border-[var(--border-color)] cursor-pointer hover:bg-[var(--bg-sec)] transition-colors"
               >
-                Recusar cookies opcionais
+                Recusar opcionais
               </button>
               <button 
                 onClick={handleAccept}
-                style={{
-                  padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                  background: "var(--text-main)", color: "var(--bg-main)", border: "none",
-                  cursor: "pointer", boxShadow: "var(--shadow-sm)"
-                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] text-[13px] font-bold bg-[var(--text-main)] text-[var(--bg-main)] border-none cursor-pointer shadow-[var(--shadow-sm)] hover:opacity-90 transition-opacity"
               >
-                Aceitar todos os cookies
+                Aceitar todos
               </button>
             </div>
           </div>
