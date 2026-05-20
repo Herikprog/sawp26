@@ -273,23 +273,23 @@ export default function RegisterPage() {
 
               {/* Checkboxes de consentimento legal */}
               <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24, textAlign: "left" }}>
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)", textTransform: "none", fontWeight: 500, letterSpacing: "normal", margin: 0 }}>
                   <input type="checkbox" checked={confirmAge} onChange={(e) => setConfirmAge(e.target.checked)}
-                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)" }}
+                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)", width: "auto", display: "inline-block", flexShrink: 0 }}
                   />
                   <span>Confirmo que tenho <strong>16 anos ou mais</strong> (exigência de idade mínima legal).</span>
                 </label>
 
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)", textTransform: "none", fontWeight: 500, letterSpacing: "normal", margin: 0 }}>
                   <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)}
-                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)" }}
+                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)", width: "auto", display: "inline-block", flexShrink: 0 }}
                   />
                   <span>Li e aceito os <Link href="/termos" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Termos e Condições</Link> de serviço.</span>
                 </label>
 
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 13, color: "var(--text-sec)", textTransform: "none", fontWeight: 500, letterSpacing: "normal", margin: 0 }}>
                   <input type="checkbox" checked={acceptPrivacy} onChange={(e) => setAcceptPrivacy(e.target.checked)}
-                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)" }}
+                    style={{ marginTop: 3, cursor: "pointer", accentColor: "var(--primary)", width: "auto", display: "inline-block", flexShrink: 0 }}
                   />
                   <span>Li e aceito a <Link href="/privacidade" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Política de Privacidade</Link>.</span>
                 </label>
