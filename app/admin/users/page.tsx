@@ -182,14 +182,28 @@ export default function AdminUsersPage() {
                   </span>
                 </td>
                 <td style={{ padding: "14px 20px" }}>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
-                    background: user.is_banned ? "rgba(248,113,113,0.15)" : "rgba(52,211,153,0.1)",
-                    color: user.is_banned ? "#f87171" : "#34d399",
-                    textTransform: "uppercase"
-                  }}>
-                    {user.is_banned ? "Banido" : "Ativo"}
-                  </span>
+                  {(() => {
+                    const isSuspended = user.suspended_until && new Date(user.suspended_until) > new Date();
+                    if (user.is_banned) {
+                      return (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: "rgba(248,113,113,0.15)", color: "#f87171", textTransform: "uppercase" }}>
+                          Banido
+                        </span>
+                      );
+                    }
+                    if (isSuspended) {
+                      return (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: "rgba(251,146,60,0.15)", color: "#fb923c", textTransform: "uppercase" }}>
+                          Suspenso
+                        </span>
+                      );
+                    }
+                    return (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: "rgba(52,211,153,0.1)", color: "#34d399", textTransform: "uppercase" }}>
+                        Ativo
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td style={{ padding: "14px 20px", fontSize: 12, color: "#555" }}>
                   {new Date(user.created_at).toLocaleDateString("pt-PT")}
@@ -252,9 +266,24 @@ export default function AdminUsersPage() {
               </button>
 
               {/* Premium */}
-              <button onClick={() => doAction("set_premium", selectedUser.id)} disabled={actionLoading}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, color: "#fbbf24", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                <Crown size={16} /> Conceder Premium
+              <button 
+                onClick={() => doAction(selectedUser.plano === "premium" ? "set_free" : "set_premium", selectedUser.id)} 
+                disabled={actionLoading}
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 10, 
+                  padding: "12px 16px", 
+                  background: selectedUser.plano === "premium" ? "rgba(100,116,139,0.08)" : "rgba(251,191,36,0.08)", 
+                  border: selectedUser.plano === "premium" ? "1px solid rgba(100,116,139,0.2)" : "1px solid rgba(251,191,36,0.2)", 
+                  borderRadius: 12, 
+                  color: selectedUser.plano === "premium" ? "#94a3b8" : "#fbbf24", 
+                  cursor: "pointer", 
+                  fontSize: 13, 
+                  fontWeight: 600 
+                }}
+              >
+                <Crown size={16} /> {selectedUser.plano === "premium" ? "Remover Premium" : "Conceder Premium"}
               </button>
 
               {/* Admin */}
@@ -277,6 +306,14 @@ export default function AdminUsersPage() {
                   <Clock size={16} /> Suspender (dias)
                 </button>
               </div>
+
+              {/* Remover Suspensão (se suspenso) */}
+              {selectedUser.suspended_until && new Date(selectedUser.suspended_until) > new Date() && (
+                <button onClick={() => doAction("unban", selectedUser.id)} disabled={actionLoading}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 12, color: "#34d399", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                  <Clock size={16} /> Remover Suspensão
+                </button>
+              )}
 
               {/* Ban */}
               <button onClick={() => doAction(selectedUser.is_banned ? "unban" : "ban", selectedUser.id)} disabled={actionLoading}
