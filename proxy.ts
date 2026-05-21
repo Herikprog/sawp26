@@ -60,10 +60,31 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Verificar estado do perfil
+  // VALIDAR SESSION TIMEOUT (30 min inatividade)
+  const lastActivityStr = request.cookies.get("x-last-activity")?.value;
+  if (lastActivityStr) {
+    const lastActivity = parseInt(lastActivityStr, 10);
+    const now = Date.now();
+    if (now - lastActivity > 30 * 60 * 1000) {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("expired", "true");
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ATUALIZAR TIMESTAMP DE ATIVIDADE
+  response.cookies.set("x-last-activity", Date.now().toString(), {
+    httpOnly: true,
+    maxAge: 30 * 60, // 30 min
+    path: "/",
+  });
+
+  // Verificar estado do perfil e admin permissions
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plano, is_banned, suspended_until, ban_reason, suspend_reason")
+    .select("plano, is_banned, suspended_until, ban_reason, suspend_reason, is_admin")
     .eq("id", user.id)
     .single();
 
@@ -99,6 +120,13 @@ export async function proxy(request: NextRequest) {
       url.searchParams.set("reason", profile.suspend_reason);
     }
     return NextResponse.redirect(url);
+  }
+
+  // Rotas ADMIN
+  if (pathname.startsWith("/api/admin")) {
+    if (!profile?.is_admin) {
+      return NextResponse.json({ error: "Forbidden — Admin access required" }, { status: 403 });
+    }
   }
 
   // Rotas que só precisam de sessão (admin, api, premium) — sem verificar assinatura

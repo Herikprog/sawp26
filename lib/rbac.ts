@@ -41,7 +41,7 @@ export interface AdminContext {
  * @returns AdminContext se validado, null se não tem acesso
  */
 export async function validateAdminAccess(
-  userId: string | null,
+  userId: string | null | undefined,
   requiredPermission?: AdminPermission
 ): Promise<AdminContext | null> {
   if (!userId) {

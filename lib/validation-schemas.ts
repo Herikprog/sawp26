@@ -148,7 +148,7 @@ export async function validateRequest<T>(
     return { data: validated as T, error: null };
   } catch (err) {
     if (err instanceof z.ZodError) {
-      const messages = err.errors.map(e => `${e.path.join(".")}: ${e.message}`).join(", ");
+      const messages = err.issues.map(e => `${e.path.join(".")}: ${e.message}`).join(", ");
       return { data: null, error: `Validação falhou: ${messages}` };
     }
     return { data: null, error: "Erro ao validar request" };

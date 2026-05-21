@@ -15,7 +15,7 @@ import { consentLogSchema, validateRequest } from "@/lib/validation-schemas";
 export async function POST(req: Request) {
   try {
     // 1. VALIDAR SCHEMA
-    const { data, error } = await validateRequest(req, consentLogSchema);
+    const { data, error } = await validateRequest<any>(req, consentLogSchema);
     if (error) {
       return NextResponse.json({ error }, { status: 400 });
     }
