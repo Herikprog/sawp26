@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       const { data: { user } } = await supabase.auth.getUser();
 
       // Se um userId foi fornecido, verificar que é o utilizador autenticado
-      if (user && userId !== user.id) {
+      if (!user || userId !== user.id) {
         return NextResponse.json(
           { error: "Não pode consentir em nome de outro utilizador." },
           { status: 403 }

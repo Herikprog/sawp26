@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Check, Zap, Shield, Crown, Star, ArrowRight } from "lucide-react";
 
@@ -14,6 +14,23 @@ const FEATURES = [
 
 export default function PremiumPage() {
   const [loading, setLoading] = useState(false);
+  const [displayPrice, setDisplayPrice] = useState<string | null>(null);
+  const [interval, setInterval] = useState("mês");
+
+  useEffect(() => {
+    fetch("/api/stripe/pricing")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.displayPrice) {
+          setDisplayPrice(data.displayPrice);
+          setInterval(data.interval || "mês");
+        }
+      })
+      .catch(() => {
+        // Fallback silencioso
+        setDisplayPrice("--");
+      });
+  }, []);
 
   async function handleSubscribe() {
     setLoading(true);
@@ -79,9 +96,9 @@ export default function PremiumPage() {
             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--warning)", marginBottom: 8 }}>Colecionador Pro</p>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 32 }}>
               <span style={{ fontSize: 36, fontWeight: 800, color: "var(--text-main)", fontFamily: "'Space Grotesk', sans-serif" }}>
-                4,99€
+                {displayPrice ?? "..."}
               </span>
-              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>/mês</span>
+              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>/{interval}</span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 40 }}>
