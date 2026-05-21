@@ -242,7 +242,7 @@ export default function StickerCard({ sticker, quantity, onUpdate, isEditMode, r
           >
             <div style={{ display: "flex", gap: 10 }}>
               <button
-                onClick={(e) => { e.stopPropagation(); updateQty(-1); }}
+                onClick={(e) => { e.stopPropagation(); updateQty(-1); setShowActions(false); }}
                 style={{
                   width: 42, height: 42, borderRadius: 12,
                   background: "var(--danger-light)", color: "var(--danger)",
@@ -254,11 +254,11 @@ export default function StickerCard({ sticker, quantity, onUpdate, isEditMode, r
                 <Minus size={18} />
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); updateQty(1); }}
+                onClick={(e) => { e.stopPropagation(); updateQty(1); setShowActions(false); }}
                 style={{
                   width: 42, height: 42, borderRadius: 12,
-                  background: "var(--success-light)", color: "var(--success)",
-                  border: "1px solid rgba(0,214,143,0.2)", cursor: "pointer",
+                  background: "var(--danger-light)", color: "var(--danger)",
+                  border: "1px solid rgba(255,77,106,0.2)", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.2s ease",
                 }}

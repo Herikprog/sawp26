@@ -100,8 +100,8 @@ export default function PrivacidadePage() {
               </p>
               <p>
                 Para exercer qualquer direito de privacidade ou para esclarecer dúvidas relativas ao tratamento dos seus dados, pode contactar o nosso Encarregado de Proteção de Dados (DPO) através do endereço de correio eletrónico:{" "}
-                <a href="mailto:bragawork01@gmail.com" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>
-                  bragawork01@gmail.com
+                <a href="mailto:suporte@trocastickers.email" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>
+                  suporte@trocastickers.email
                 </a>.
               </p>
             </section>

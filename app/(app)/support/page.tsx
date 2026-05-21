@@ -80,7 +80,10 @@ export default function SupportPage() {
           Suporte e Denúncias
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-sec)", lineHeight: 1.6 }}>
-          Tens algum problema, dúvida ou queres denunciar um utilizador? Envia-nos uma mensagem e acompanha as respostas.
+          Tens algum problema, dúvida ou queres denunciar um utilizador? Envia-nos uma mensagem e acompanha as respostas. Se preferires, também nos podes contactar pelo e-mail:{" "}
+          <a href="mailto:suporte@trocastickers.email" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+            suporte@trocastickers.email
+          </a>
         </p>
       </div>
 

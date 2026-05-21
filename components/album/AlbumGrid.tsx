@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import type { Sticker } from "@/types";
 import StickerCard from "./StickerCard";
 import ProgressBar from "./ProgressBar";
-import { Search, Edit3, Check, X, ArrowLeft, ChevronRight } from "lucide-react";
+import { Search, Edit3, Check, X, ArrowLeft, ChevronRight, Plus, Hash } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 
@@ -49,6 +49,8 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"Todas" | "Faltantes" | "Repetidas">("Todas");
+  const [codeInput, setCodeInput] = useState("");
+  const [codeAddResult, setCodeAddResult] = useState<{ added: string[]; notFound: string[] } | null>(null);
 
   useEffect(() => {
     setStickerMap(userStickers);
@@ -106,6 +108,34 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
 
   const handleUpdate = (id: string, newQty: number) => {
     setStickerMap(prev => ({ ...prev, [id]: newQty }));
+  };
+
+  const normalizeCode = (code: string) => {
+    // Remove leading zeros from numeric portion, uppercase
+    return code.toUpperCase().replace(/^([A-Z]+)(0+)(\d)/, "$1$3");
+  };
+
+  const handleBatchAdd = () => {
+    const rawCodes = codeInput.trim().split(/\s+/).filter(Boolean);
+    const added: string[] = [];
+    const notFound: string[] = [];
+
+    const newMap = { ...stickerMap };
+    rawCodes.forEach(raw => {
+      const norm = normalizeCode(raw);
+      const match = stickers.find(s => normalizeCode(s.codigo) === norm);
+      if (match) {
+        newMap[match.id] = (newMap[match.id] ?? 0) + 1;
+        added.push(match.codigo);
+      } else {
+        notFound.push(raw);
+      }
+    });
+
+    setStickerMap(newMap);
+    setCodeInput("");
+    setCodeAddResult({ added, notFound });
+    setTimeout(() => setCodeAddResult(null), 4000);
   };
 
   const globalStats = useMemo(() => {
@@ -204,22 +234,68 @@ export default function AlbumGrid({ stickers, userStickers, readOnly }: Props) {
         </div>
         
         {!readOnly && (
-          <button
-            onClick={() => setIsEditMode(!isEditMode)}
-            className="btn-active-scale"
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", borderRadius: 12,
-              background: isEditMode ? "var(--gradient-success)" : "var(--bg-hover-strong)",
-              color: isEditMode ? "#fff" : "var(--text-main)",
-              border: isEditMode ? "none" : "1px solid var(--border-color)",
-              fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.25s ease",
-              alignSelf: "flex-start",
-              boxShadow: isEditMode ? "0 6px 16px rgba(0,214,143,0.2)" : "none",
-            }}
-          >
-            {isEditMode ? <Check size={14} /> : <Edit3 size={14} />}
-            {isEditMode ? "Guardar" : "Edição Rápida"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, alignSelf: "flex-start" }}>
+            <button
+              onClick={() => { setIsEditMode(!isEditMode); setCodeAddResult(null); }}
+              className="btn-active-scale"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", borderRadius: 12,
+                background: isEditMode ? "var(--gradient-success)" : "var(--bg-hover-strong)",
+                color: isEditMode ? "#fff" : "var(--text-main)",
+                border: isEditMode ? "none" : "1px solid var(--border-color)",
+                fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.25s ease",
+                boxShadow: isEditMode ? "0 6px 16px rgba(0,214,143,0.2)" : "none",
+              }}
+            >
+              {isEditMode ? <Check size={14} /> : <Edit3 size={14} />}
+              {isEditMode ? "Guardar" : "Edição Rápida"}
+            </button>
+
+            {isEditMode && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ position: "relative", flex: 1 }}>
+                    <Hash size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                    <input
+                      type="text"
+                      value={codeInput}
+                      onChange={e => setCodeInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") handleBatchAdd(); }}
+                      placeholder="Ex: POR5 BRA01 ARG12"
+                      style={{
+                        width: "100%", background: "var(--input-bg)", border: "1px solid var(--border-color)",
+                        borderRadius: 10, padding: "9px 10px 9px 30px", color: "var(--text-main)",
+                        fontSize: 12, outline: "none", transition: "all 0.2s ease",
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleBatchAdd}
+                    className="btn-active-scale"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, padding: "9px 14px", borderRadius: 10,
+                      background: "var(--gradient-primary)", color: "#fff", border: "none",
+                      fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Plus size={13} /> Adicionar
+                  </button>
+                </div>
+
+                {codeAddResult && (
+                  <div style={{ fontSize: 11, borderRadius: 8, padding: "6px 10px", background: "var(--card-bg)", border: "1px solid var(--border-light)" }}>
+                    {codeAddResult.added.length > 0 && (
+                      <span style={{ color: "var(--success)", fontWeight: 700 }}>✓ {codeAddResult.added.join(" ")}</span>
+                    )}
+                    {codeAddResult.added.length > 0 && codeAddResult.notFound.length > 0 && " · "}
+                    {codeAddResult.notFound.length > 0 && (
+                      <span style={{ color: "var(--danger)", fontWeight: 700 }}>✗ {codeAddResult.notFound.join(" ")}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

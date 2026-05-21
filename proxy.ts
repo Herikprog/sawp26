@@ -15,6 +15,7 @@ export async function proxy(request: NextRequest) {
   if (
     (PUBLIC_ROUTES.some((r) => pathname.startsWith(r)) && !pathname.startsWith("/banned")) ||
     pathname.startsWith("/api/stripe/webhook") ||
+    pathname.startsWith("/api/push") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||
