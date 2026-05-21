@@ -61,10 +61,10 @@
 ## 🟠 ALTAS (9)
 
 ### 9. Sem middleware global de autenticação
-- **Arquivo:** Falta arquivo `middleware.ts` na raiz
+- **Arquivo:** `proxy.ts` na raiz (substitui `middleware.ts` para evitar conflitos de build)
 - **Erro:** Routes sensíveis sem validação central de sessão
 - **Impacto:** Possível bypass de autenticação, session timeout não enforçado
-- **Status:** ✅ CORRIGIDO - Arquivo `middleware.ts` adicionado na raiz, mapeando e invocando a lógica do proxy central de segurança
+- **Status:** ✅ CORRIGIDO - A lógica de middleware global está ativa e centralizada no arquivo `proxy.ts` (exigido pela plataforma/configuração para evitar erros de compilação por duplicidade).
 
 
 ### 10. Service Role Key exposto em logs de erro
