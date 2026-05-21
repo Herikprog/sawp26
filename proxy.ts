@@ -122,14 +122,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Rotas ADMIN
-  if (pathname.startsWith("/api/admin")) {
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: "Forbidden — Admin access required" }, { status: 403 });
-    }
-  }
-
   // Rotas que só precisam de sessão (admin, api, premium) — sem verificar assinatura
+  // Nota: rotas /api/admin são protegidas pelo RBAC no route handler (validateAdminAccess com service role key)
   if (SESSION_ONLY_ROUTES.some((r) => pathname.startsWith(r))) {
     return response;
   }
