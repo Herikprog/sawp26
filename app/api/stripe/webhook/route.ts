@@ -41,6 +41,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No user_id in metadata" }, { status: 400 });
     }
 
+    if (session.payment_status !== "paid") {
+      console.error("[Stripe Webhook] Pagamento não confirmado para a sessão:", session.id);
+      return NextResponse.json({ error: "Pagamento não confirmado" }, { status: 400 });
+    }
+
+    // Re-validar contra o Supabase se o utilizador existe
+    const { data: userProfile, error: userErr } = await supabase.from("profiles").select("id").eq("id", userId).single();
+    if (userErr || !userProfile) {
+      console.error("[Stripe Webhook] User ID não encontrado no Supabase:", userId);
+      return NextResponse.json({ error: "Utilizador não encontrado" }, { status: 404 });
+    }
+
     // 1. Update profile to premium
     const { error: profileError } = await supabase
       .from("profiles")

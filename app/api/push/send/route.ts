@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import crypto from "crypto";
+import { 
+  checkPushNotificationRateLimit,
+  createRateLimitHeaders,
+} from "@/lib/rate-limit";
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
@@ -13,7 +18,73 @@ if (vapidPublicKey && vapidPrivateKey) {
   );
 }
 
+/**
+ * VALIDAR WEBHOOK SIGNATURE DO SUPABASE
+ * 
+ * Este endpoint é chamado APENAS pelo Supabase Webhook.
+ * Validamos a assinatura HMAC antes de processar.
+ * 
+ * Isso protege contra:
+ * - Requisições de terceiros
+ * - Replay attacks
+ * - Manipulação de payloads
+ */
+function validateWebhookSignature(request: Request, body: string): boolean {
+  const signature = request.headers.get("x-supabase-signature");
+  const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET;
+
+  if (!signature || !webhookSecret) {
+    console.error("[Push Webhook] Falta assinatura ou webhook secret");
+    return false;
+  }
+
+  // Formato esperado: t=timestamp,v1=hash
+  const [timestamp, hash] = signature.split(",").map(s => s.split("=")[1]) || [];
+
+  if (!timestamp || !hash) {
+    console.error("[Push Webhook] Assinatura em formato inválido");
+    return false;
+  }
+
+  // Validar que timestamp não é muito antigo (máx 5 min)
+  const now = Math.floor(Date.now() / 1000);
+  const reqTime = parseInt(timestamp);
+  if (Math.abs(now - reqTime) > 300) {
+    console.error("[Push Webhook] Timestamp muito antigo (replay attack?)");
+    return false;
+  }
+
+  // Validar HMAC-SHA256
+  const expectedHash = crypto
+    .createHmac("sha256", webhookSecret)
+    .update(`${timestamp}.${body}`)
+    .digest("base64");
+
+  // Usar crypto.timingSafeEqual para evitar timing attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(hash),
+      Buffer.from(expectedHash)
+    );
+  } catch (err) {
+    console.error("[Push Webhook] Erro ao comparar hashes");
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  // ─── VERIFICAR RATE LIMIT (CRÍTICO) ───
+  const limit = checkPushNotificationRateLimit(request);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: createRateLimitHeaders(limit),
+      }
+    );
+  }
+
   if (!vapidPublicKey || !vapidPrivateKey) {
     console.error("VAPID Keys não configuradas nas variáveis de ambiente da Vercel.");
     return NextResponse.json({ error: "VAPID Keys não configuradas." }, { status: 500 });
@@ -27,11 +98,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada." }, { status: 500 });
   }
 
+  // ─── VALIDAR ASSINATURA DO WEBHOOK (CRÍTICO) ───
+  const rawBody = await request.text();
+  if (!validateWebhookSignature(request, rawBody)) {
+    console.error("[Push Webhook] Assinatura inválida — Requisição rejeitada");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
 
   try {
     // Obter o payload enviado pelo Webhook do Supabase
-    const body = await request.json();
+    const body = JSON.parse(rawBody);
     const { table, record } = body;
 
     if (!record) {

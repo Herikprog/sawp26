@@ -51,8 +51,17 @@ export default function RealtimeManager() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
+            const lon = pos.coords.longitude;
+            const lat = pos.coords.latitude;
+            
+            // Validar coordenadas do GPS (evitar falsificação extrema)
+            if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+              console.warn("Coordenadas GPS inválidas");
+              return;
+            }
+
             // Padrão PostGIS: POINT(longitude latitude)
-            const point = `POINT(${pos.coords.longitude} ${pos.coords.latitude})`;
+            const point = `POINT(${lon} ${lat})`;
             
             const { error } = await supabase.from("profiles")
               .update({ location: point })

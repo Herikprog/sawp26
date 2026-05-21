@@ -1,31 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { validateAdminAccess } from "@/lib/rbac";
+import { checkAdminActionRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
 
-async function verifyAdmin() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-    const admin = await createAdminClient();
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("is_admin, perm_ban, perm_suspend")
-      .eq("id", user.id)
-      .single();
-    if (!isEmailAdmin && !profile?.is_admin) return null;
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-    return { user, admin };
-  } catch (err) {
-    return null;
+  if (!adminCtx.permissions.has("perm_logs")) {
+    return NextResponse.json({ error: "Sem permissão para visualizar logs." }, { status: 403 });
   }
-}
 
-export async function GET() {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
 
-  const { data: logs, error } = await ctx.admin
+  const adminClient = await createAdminClient();
+  const { data: logs, error } = await adminClient
     .from("ban_suspension_logs")
     .select(`
       id,

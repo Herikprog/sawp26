@@ -18,11 +18,11 @@ CREATE TABLE IF NOT EXISTS public.post_likes (
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.post_likes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Anyone can view posts" ON public.posts FOR SELECT USING (true);
+CREATE POLICY "Anyone can view posts" ON public.posts FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated users can create posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete their own posts" ON public.posts FOR DELETE USING (auth.uid() = user_id);
 
-CREATE POLICY "Anyone can view likes" ON public.post_likes FOR SELECT USING (true);
+CREATE POLICY "Anyone can view likes" ON public.post_likes FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated users can like" ON public.post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can unlike" ON public.post_likes FOR DELETE USING (auth.uid() = user_id);
 

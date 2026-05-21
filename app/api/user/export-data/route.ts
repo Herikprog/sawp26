@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Utilizador não autenticado." }, { status: 401 });
+    }
+
+    const { checkPublicEndpointRateLimit, createRateLimitHeaders } = await import("@/lib/rate-limit");
+    const limit = checkPublicEndpointRateLimit(request);
+    if (!limit.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
     }
 
     // 1. Perfil do utilizador

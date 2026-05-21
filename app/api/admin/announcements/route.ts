@@ -1,28 +1,25 @@
 import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-
-async function verifyAdmin() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-    const admin = await createAdminClient();
-    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-    if (!isEmailAdmin && !profile?.is_admin) return null;
-    return { user, admin };
-  } catch (err: any) {
-    console.error("[verifyAdmin] error:", err.message);
-    return null;
-  }
-}
+import { validateAdminAccess, logAdminAction } from "@/lib/rbac";
+import { checkAdminActionRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
+import { adminAnnouncementSchema, validateRequest } from "@/lib/validation-schemas";
 
 // GET — listar anúncios
-export async function GET() {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const { data: announcements, error } = await ctx.admin
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
+
+  const adminClient = await createAdminClient();
+  const { data: announcements, error } = await adminClient
     .from("global_announcements")
     .select("*")
     .order("created_at", { ascending: false });
@@ -33,43 +30,98 @@ export async function GET() {
 
 // POST — criar novo anúncio
 export async function POST(request: Request) {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const { title, body, type, expires_at } = await request.json();
-  if (!title || !body) return NextResponse.json({ error: "Título e mensagem são obrigatórios." }, { status: 400 });
+  if (!adminCtx.permissions.has("perm_announcements")) {
+    return NextResponse.json({ error: "Sem permissão para gerir anúncios." }, { status: 403 });
+  }
 
-  const { data, error } = await ctx.admin.from("global_announcements").insert({
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
+
+  const { data, error: validationError } = await validateRequest<any>(request, adminAnnouncementSchema);
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+
+  const { title, body, type, expires_at } = data;
+  const adminClient = await createAdminClient();
+
+  const { data: announcement, error } = await adminClient.from("global_announcements").insert({
     title,
     body,
     type: type || "info",
     active: true,
-    created_by: ctx.user.id,
+    created_by: adminCtx.userId,
     expires_at: expires_at || null,
   }).select().single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ announcement: data });
+  
+  await logAdminAction(adminCtx.userId, "create_announcement", null, { title }, "success");
+  
+  return NextResponse.json({ announcement });
 }
 
 // PATCH — ativar/desativar anúncio
 export async function PATCH(request: Request) {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+  if (!adminCtx.permissions.has("perm_announcements")) {
+    return NextResponse.json({ error: "Sem permissão para gerir anúncios." }, { status: 403 });
+  }
+
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
 
   const { id, active } = await request.json();
-  const { error } = await ctx.admin.from("global_announcements").update({ active }).eq("id", id);
+  const adminClient = await createAdminClient();
+  
+  const { error } = await adminClient.from("global_announcements").update({ active }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  
+  await logAdminAction(adminCtx.userId, "update_announcement", null, { id, active }, "success");
+  
   return NextResponse.json({ success: true });
 }
 
 // DELETE — apagar anúncio
 export async function DELETE(request: Request) {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+  if (!adminCtx.permissions.has("perm_announcements")) {
+    return NextResponse.json({ error: "Sem permissão para gerir anúncios." }, { status: 403 });
+  }
+
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
 
   const { id } = await request.json();
-  const { error } = await ctx.admin.from("global_announcements").delete().eq("id", id);
+  const adminClient = await createAdminClient();
+  
+  const { error } = await adminClient.from("global_announcements").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  
+  await logAdminAction(adminCtx.userId, "delete_announcement", null, { id }, "success");
+  
   return NextResponse.json({ success: true });
 }

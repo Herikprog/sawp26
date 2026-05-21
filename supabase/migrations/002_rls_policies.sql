@@ -15,7 +15,7 @@ ALTER TABLE notifications  ENABLE ROW LEVEL SECURITY;
 -- PROFILES
 -- ============================================================
 CREATE POLICY "profiles_select_all"
-  ON profiles FOR SELECT USING (true);
+  ON profiles FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE POLICY "profiles_insert_own"
   ON profiles FOR INSERT WITH CHECK (auth.uid() = id);

@@ -1,45 +1,32 @@
 import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-
-async function verifyAdmin() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-    const admin = await createAdminClient();
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("is_admin, perm_tickets")
-      .eq("id", user.id)
-      .single();
-    if (!isEmailAdmin && !profile?.is_admin) return null;
-
-    const permissions = {
-      perm_tickets: isEmailAdmin ? true : !!profile?.perm_tickets,
-    };
-
-    return { user, admin, permissions, isSuperAdmin: isEmailAdmin };
-  } catch (err: any) {
-    console.error("[verifyAdmin] error:", err.message);
-    return null;
-  }
-}
+import { validateAdminAccess, logAdminAction } from "@/lib/rbac";
+import { checkAdminActionRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
 
 // GET — listar tickets + denúncias (support_tickets + user_reports + post_reports unificados)
 export async function GET(request: Request) {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
   
-  if (!ctx.permissions.perm_tickets) {
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  
+  if (!adminCtx.permissions.has("perm_tickets")) {
     return NextResponse.json({ error: "Sem permissão para visualizar tickets de suporte." }, { status: 403 });
+  }
+
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
   }
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || "open";
+  const adminClient = await createAdminClient();
 
   // 1. Buscar support_tickets (origem: página de suporte)
-  const { data: tickets, error: ticketError } = await ctx.admin
+  const { data: tickets, error: ticketError } = await adminClient
     .from("support_tickets")
     .select("*, profiles(nome, cidade, plano)")
     .eq("status", status)
@@ -50,12 +37,11 @@ export async function GET(request: Request) {
   // 2. Buscar user_reports (origem: botão Denunciar no perfil/chat) — apenas se status === "open"
   let mappedReports: any[] = [];
   if (status === "open") {
-    const { data: reports } = await ctx.admin
+    const { data: reports } = await adminClient
       .from("user_reports")
       .select("*, reporter:profiles!user_reports_reporter_id_fkey(nome, cidade, plano), reported:profiles!user_reports_reported_id_fkey(nome)")
       .order("created_at", { ascending: false });
 
-    // Mapear user_reports para o mesmo formato de support_tickets
     if (reports) {
       mappedReports = reports.map((r: any) => ({
         id: `report_${r.id}`,
@@ -76,28 +62,12 @@ export async function GET(request: Request) {
 
   // 3. Buscar post_reports (origem: denúncia de publicação no feed)
   let mappedPostReports: any[] = [];
-  const { data: pReports } = await ctx.admin
+  const { data: pReports } = await adminClient
     .from("post_reports")
     .select(`
-      id,
-      reporter_id,
-      post_id,
-      reason,
-      details,
-      status,
-      admin_reply,
-      created_at,
-      posts (
-        content,
-        profiles!posts_user_id_fkey (
-          nome
-        )
-      ),
-      reporter:profiles!reporter_id (
-        nome,
-        cidade,
-        plano
-      )
+      id, reporter_id, post_id, reason, details, status, admin_reply, created_at,
+      posts (content, profiles!posts_user_id_fkey (nome)),
+      reporter:profiles!reporter_id (nome, cidade, plano)
     `)
     .eq("status", status)
     .order("created_at", { ascending: false });
@@ -120,7 +90,6 @@ export async function GET(request: Request) {
     }));
   }
 
-  // Unir as três fontes
   const allTickets = [...(tickets || []), ...mappedReports, ...mappedPostReports];
 
   return NextResponse.json({ tickets: allTickets });
@@ -128,44 +97,47 @@ export async function GET(request: Request) {
 
 // PATCH — responder ou fechar ticket
 export async function PATCH(request: Request) {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  if (!ctx.permissions.perm_tickets) {
+  if (!adminCtx.permissions.has("perm_tickets")) {
     return NextResponse.json({ error: "Sem permissão para responder a tickets de suporte." }, { status: 403 });
   }
 
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
+
   const { id, admin_reply, user_id, status } = await request.json();
+  const adminClient = await createAdminClient();
 
   // Proteger tickets/denúncias criados pelo bragawork01@gmail.com
   try {
     if (!String(id).startsWith("report_") && !String(id).startsWith("post_report_")) {
-      const { data: ticket } = await ctx.admin
-        .from("support_tickets")
-        .select("user_id")
-        .eq("id", id)
-        .single();
-
+      const { data: ticket } = await adminClient.from("support_tickets").select("user_id").eq("id", id).single();
       if (ticket) {
-        const { data: targetUser } = await ctx.admin.auth.admin.getUserById(ticket.user_id);
-        if (targetUser?.user?.email?.toLowerCase() === "bragawork01@gmail.com") {
+        const { data: targetUser } = await adminClient.auth.admin.getUserById(ticket.user_id);
+        if (targetUser?.user?.email?.toLowerCase() === "bragawork01@gmail.com" && adminCtx.email !== "bragawork01@gmail.com") {
           return NextResponse.json({ error: "Não é permitido alterar ou fechar tickets do Administrador Principal." }, { status: 403 });
         }
       }
     } else {
-      const { data: targetUser } = await ctx.admin.auth.admin.getUserById(user_id);
-      if (targetUser?.user?.email?.toLowerCase() === "bragawork01@gmail.com") {
+      const { data: targetUser } = await adminClient.auth.admin.getUserById(user_id);
+      if (targetUser?.user?.email?.toLowerCase() === "bragawork01@gmail.com" && adminCtx.email !== "bragawork01@gmail.com") {
         return NextResponse.json({ error: "Não é permitido alterar ou responder a denúncias criadas pelo Administrador Principal." }, { status: 403 });
       }
     }
   } catch (_) {}
 
-  // Se for um post report (id começa com "post_report_")
+  // Se for um post report
   if (String(id).startsWith("post_report_")) {
     const rawId = String(id).replace("post_report_", "");
-    const updatePayload: any = {
-      replied_at: new Date().toISOString(),
-    };
+    const updatePayload: any = { replied_at: new Date().toISOString() };
 
     if (admin_reply !== undefined) {
       updatePayload.admin_reply = admin_reply;
@@ -176,19 +148,15 @@ export async function PATCH(request: Request) {
       updatePayload.status = status;
     }
 
-    const { error } = await ctx.admin
-      .from("post_reports")
-      .update(updatePayload)
-      .eq("id", rawId);
-
+    const { error } = await adminClient.from("post_reports").update(updatePayload).eq("id", rawId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    
+    await logAdminAction(adminCtx.userId, "reply_post_report", null, { reportId: rawId, status }, "success");
 
     if (admin_reply && user_id) {
       try {
-        await ctx.admin.from("social_notifications").insert({
-          user_id,
-          actor_id: ctx.user.id,
-          type: "admin_reply",
+        await adminClient.from("social_notifications").insert({
+          user_id, actor_id: adminCtx.userId, type: "admin_reply",
           content: `A tua denúncia de publicação foi respondida pelo administrador: "${admin_reply.substring(0, 100)}${admin_reply.length > 100 ? "..." : ""}"`,
         });
       } catch (_) {}
@@ -197,14 +165,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true, message: "Resposta de denúncia de post registada." });
   }
 
-  // Se for um report do botão de denúncia (id começa com "report_"), ignorar update na tabela support_tickets
+  // Se for um user report
   if (String(id).startsWith("report_")) {
+    await logAdminAction(adminCtx.userId, "reply_user_report", null, { reportId: id }, "success");
     if (admin_reply && user_id) {
       try {
-        await ctx.admin.from("social_notifications").insert({
-          user_id,
-          actor_id: ctx.user.id,
-          type: "admin_reply",
+        await adminClient.from("social_notifications").insert({
+          user_id, actor_id: adminCtx.userId, type: "admin_reply",
           content: `A tua denúncia foi analisada pelo administrador: "${admin_reply.substring(0, 120)}${admin_reply.length > 120 ? "..." : ""}"`,
         });
       } catch (_) {}
@@ -212,9 +179,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true, message: "Resposta registada." });
   }
 
-  const updatePayload: any = {
-    updated_at: new Date().toISOString(),
-  };
+  const updatePayload: any = { updated_at: new Date().toISOString() };
 
   if (admin_reply !== undefined) {
     updatePayload.admin_reply = admin_reply;
@@ -226,20 +191,15 @@ export async function PATCH(request: Request) {
     updatePayload.status = status;
   }
 
-  const { error } = await ctx.admin
-    .from("support_tickets")
-    .update(updatePayload)
-    .eq("id", id);
-
+  const { error } = await adminClient.from("support_tickets").update(updatePayload).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  
+  await logAdminAction(adminCtx.userId, "reply_ticket", null, { ticketId: id, status }, "success");
 
-  // Notificar o utilizador via social_notifications
   if (admin_reply && user_id) {
     try {
-      await ctx.admin.from("social_notifications").insert({
-        user_id,
-        actor_id: ctx.user.id,
-        type: "admin_reply",
+      await adminClient.from("social_notifications").insert({
+        user_id, actor_id: adminCtx.userId, type: "admin_reply",
         content: `A tua mensagem de suporte foi respondida pelo administrador: "${admin_reply.substring(0, 100)}${admin_reply.length > 100 ? "..." : ""}"`,
       });
     } catch (_) {}

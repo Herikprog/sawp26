@@ -1,27 +1,22 @@
 import { NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { validateAdminAccess } from "@/lib/rbac";
+import { checkAdminActionRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
 
-async function verifyAdmin() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const isEmailAdmin = user?.email?.toLowerCase() === "bragawork01@gmail.com";
-    const admin = await createAdminClient();
-    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
-    if (!isEmailAdmin && !profile?.is_admin) return null;
-    return { user, admin };
-  } catch (err: any) {
-    console.error("[verifyAdmin] error:", err.message);
-    return null;
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const adminCtx = await validateAdminAccess(user?.id);
+  
+  if (!adminCtx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+  // Rate Limiting
+  const limit = checkAdminActionRateLimit(adminCtx.userId);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
   }
-}
 
-export async function GET() {
-  const ctx = await verifyAdmin();
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-
-  const admin = ctx.admin;
+  const adminClient = await createAdminClient();
 
   const [
     { count: totalUsers },
@@ -30,21 +25,21 @@ export async function GET() {
     { count: bannedUsers },
     { count: openTickets },
   ] = await Promise.all([
-    admin.from("profiles").select("*", { count: "exact", head: true }),
-    admin.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "premium"),
-    admin.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "free"),
-    admin.from("profiles").select("*", { count: "exact", head: true }).eq("is_banned", true),
-    admin.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "open"),
+    adminClient.from("profiles").select("*", { count: "exact", head: true }),
+    adminClient.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "premium"),
+    adminClient.from("profiles").select("*", { count: "exact", head: true }).eq("plano", "free"),
+    adminClient.from("profiles").select("*", { count: "exact", head: true }).eq("is_banned", true),
+    adminClient.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "open"),
   ]);
 
   let recentSignups: any[] = [];
   try {
-    const { data } = await admin.rpc("get_daily_signups_14d");
+    const { data } = await adminClient.rpc("get_daily_signups_14d");
     if (data) recentSignups = data;
   } catch (err) {}
 
   // Distribuição por país/cidade (top 10)
-  const { data: cityDist } = await admin
+  const { data: cityDist } = await adminClient
     .from("profiles")
     .select("cidade")
     .not("cidade", "is", null)

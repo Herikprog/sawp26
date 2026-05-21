@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkPublicEndpointRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
+  const limit = checkPublicEndpointRateLimit(request);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: createRateLimitHeaders(limit) });
+  }
+
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
