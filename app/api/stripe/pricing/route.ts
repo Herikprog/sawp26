@@ -3,34 +3,56 @@ import { stripe } from "@/lib/stripe";
 
 /**
  * Detetar país do utilizador automaticamente pelos headers do request.
+ * 
+ * Prioridade:
+ * 1. x-vercel-ip-country (Vercel)
+ * 2. cf-ipcountry (Cloudflare)
+ * 3. Accept-Language (fallback)
  */
 function detectCountry(request: NextRequest): string {
+  // 1. Vercel
   const vercelCountry = request.headers.get("x-vercel-ip-country");
   if (vercelCountry) return vercelCountry.toUpperCase();
 
+  // 2. Cloudflare
   const cfCountry = request.headers.get("cf-ipcountry");
   if (cfCountry && cfCountry !== "XX") return cfCountry.toUpperCase();
 
+  // 3. Accept-Language fallback
   const acceptLang = request.headers.get("accept-language") || "";
   if (acceptLang.includes("pt-BR")) return "BR";
+  if (acceptLang.includes("pt")) return "PT";
+  if (acceptLang.includes("es")) return "ES";
+  if (acceptLang.includes("fr")) return "FR";
+  if (acceptLang.includes("de")) return "DE";
+  if (acceptLang.includes("it")) return "IT";
+  if (acceptLang.includes("en-GB")) return "GB";
+  if (acceptLang.includes("en")) return "US";
 
-  return "PT"; // Fallback para Portugal/EUR
+  return "PT"; // Fallback padrão unificado para Portugal/EUR (adequado para o domínio .pt)
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const country = detectCountry(request);
-    const isBR = country === "BR";
+  const country = detectCountry(request);
+  const isBR = country === "BR";
+  const fallbackPrice = isBR ? "R$ 19,90" : "4,99€";
+  const fallbackCurrency = isBR ? "BRL" : "EUR";
+  const fallbackInterval = "mês";
 
+  try {
     const priceId = isBR
       ? process.env.STRIPE_PREMIUM_PRICE_BRL
       : process.env.STRIPE_PREMIUM_PRICE_EUR;
 
     if (!priceId) {
-      return NextResponse.json(
-        { error: "Preço não configurado." },
-        { status: 500 }
-      );
+      console.warn(`[Stripe Pricing] Price ID not set in environment for country ${country}. Returning graceful fallback.`);
+      return NextResponse.json({
+        displayPrice: fallbackPrice,
+        currency: fallbackCurrency,
+        country,
+        interval: fallbackInterval,
+        isFallback: true,
+      });
     }
 
     // Buscar o preço real da Stripe
@@ -66,9 +88,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Stripe Pricing Error:", error);
-    return NextResponse.json(
-      { error: "Erro ao obter preço." },
-      { status: 500 }
-    );
+    
+    // Retornar fallback gracioso em vez de falhar com erro 500 no cliente
+    return NextResponse.json({
+      displayPrice: fallbackPrice,
+      currency: fallbackCurrency,
+      country,
+      interval: fallbackInterval,
+      isFallback: true,
+      errorDetail: error instanceof Error ? error.message : String(error),
+    });
   }
 }

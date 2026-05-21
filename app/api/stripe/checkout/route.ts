@@ -30,7 +30,7 @@ function detectCountry(request: NextRequest): string {
   if (acceptLang.includes("en-GB")) return "GB";
   if (acceptLang.includes("en")) return "US";
 
-  return "BR"; // Fallback padrão para Brasil
+  return "PT"; // Fallback padrão unificado para Portugal/EUR (evita cobrar a moeda incorreta)
 }
 
 export async function POST(request: NextRequest) {
@@ -39,21 +39,34 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Utilizador não autenticado." }, { status: 401 });
     }
 
     // Detetar país
     const country = detectCountry(request);
 
     // Selecionar o Price ID com base no país (BR -> BRL, resto -> EUR)
-    const priceId = country === "BR"
+    let priceId = country === "BR"
       ? process.env.STRIPE_PREMIUM_PRICE_BRL
       : process.env.STRIPE_PREMIUM_PRICE_EUR;
 
+    // Fallback de retrocompatibilidade com preço genérico se os novos não estiverem definidos
     if (!priceId) {
-      console.error(`Preço do Stripe não configurado para o país ${country} (moeda selecionada).`);
+      priceId = process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID || process.env.STRIPE_PREMIUM_PRICE_ID;
+    }
+
+    if (!priceId) {
+      console.error(`Preço do Stripe não configurado para o país ${country} e nenhum fallback genérico disponível.`);
       return NextResponse.json(
-        { error: "Configuração de pagamento em falta no servidor." },
+        { error: "Erro de configuração: Os IDs dos planos Stripe não estão definidos no servidor." },
+        { status: 500 }
+      );
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("STRIPE_SECRET_KEY ausente nas variáveis de ambiente do servidor.");
+      return NextResponse.json(
+        { error: "Erro de configuração: A chave secreta Stripe está em falta no servidor." },
         { status: 500 }
       );
     }
@@ -79,8 +92,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
     console.error("Stripe Checkout Error:", error);
+    
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
     return NextResponse.json(
-      { error: "Erro ao criar sessão de pagamento." },
+      { error: `Erro ao criar sessão de pagamento: ${errorMessage}` },
       { status: 500 }
     );
   }
