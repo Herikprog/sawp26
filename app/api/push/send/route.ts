@@ -146,7 +146,7 @@ export async function POST(request: Request) {
         title: pushTitle,
         body: pushBody,
         url: pushUrl,
-        icon: "/icon-192.png"
+        icon: "/favicon.ico"
       });
 
       try {
